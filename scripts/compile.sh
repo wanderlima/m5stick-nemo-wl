@@ -44,10 +44,15 @@ echo "Extra flags: $extra_flags"
 echo "Libraries: $libraries"
 echo "Bootloader address: $bootloader_addr"
 
-locale=${LOCALE:-en-us}
+locale="${locale:-en-us}"
 language=$(echo "LANGUAGE_${locale//-/_}" | tr '[:lower:]' '[:upper:]')
 
-extra_flags="${EXTRA_FLAGS} -D${language}"
+extra_flags="${extra_flags} -D${language}"
+
+chip="esp32"
+if [[ "$fqbn" == *cardputer* || "$fqbn" == *esp32s3* ]]; then
+  chip="esp32s3"
+fi
 
 arduino-cli compile --log \
   --fqbn $fqbn \
@@ -66,7 +71,7 @@ fi
 
 echo "Merging binaries to ${output_file}"
 
-esptool.py --chip esp32s3 merge_bin --output ./m5stick-nemo/build/${output_file}  \
+esptool.py --chip ${chip} merge_bin --output ./m5stick-nemo/build/${output_file}  \
             ${bootloader_addr} ./m5stick-nemo/build/m5stick-nemo.ino.bootloader.bin \
             0x8000 ./m5stick-nemo/build/m5stick-nemo.ino.partitions.bin \
             0x10000 ./m5stick-nemo/build/m5stick-nemo.ino.bin

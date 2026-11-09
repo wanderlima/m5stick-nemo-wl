@@ -1,4 +1,4 @@
-FROM python:3.6-slim
+FROM python:3.12-slim-bookworm
 
 ENV PYTHONBUFFERED=1
 
@@ -6,20 +6,19 @@ ENV PYTHONBUFFERED=1
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     bash \
+    ca-certificates \
  && apt-get clean \
  && rm -rf /var/lib/apt/lists/*
 
 RUN curl -fsSL https://raw.githubusercontent.com/arduino/arduino-cli/master/install.sh | BINDIR=/usr/bin sh
 
-# Ensure pip is installed and upgrade it
-RUN python3 -m ensurepip
 RUN pip3 install --no-cache --upgrade pip setuptools pyserial esptool
 
-# Install 32-bit C++ standard library
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    lib32stdc++6 \
- && apt-get clean \
- && rm -rf /var/lib/apt/lists/*
+# Older x86 toolchains need the 32-bit loader. arm64 images use the native toolchain.
+RUN if [ "$(dpkg --print-architecture)" = "amd64" ]; then \
+      apt-get update && apt-get install -y --no-install-recommends lib32stdc++6 \
+      && apt-get clean && rm -rf /var/lib/apt/lists/*; \
+    fi
 
 # Install m5stack boards
 COPY ./package_m5stack_index.json /package_m5stack_index.json

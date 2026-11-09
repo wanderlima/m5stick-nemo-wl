@@ -11,4 +11,9 @@ docker build ./ --build-arg LIBRARIES="$LIBRARIES" -t m5stick-nemo/arduino-build
 
 mkdir -p build
 
-docker run --rm -it -v $(pwd):/m5stick-nemo m5stick-nemo/arduino-build-cli:test /compile.sh --name="$NAME" --fqbn="$FQBN" --extra-flags="$EXTRA_FLAGS" --libraries="$LIBRARIES" --bootloader-addr="$BOOTLOADER_ADDR" --locale="$LOCALE"
+tty_flags=""
+if [ -t 0 ] && [ -t 1 ]; then
+  tty_flags="-it"
+fi
+
+docker run --rm $tty_flags -v $(pwd):/m5stick-nemo m5stick-nemo/arduino-build-cli:test /compile.sh --name="$NAME" --fqbn="$FQBN" --extra-flags="$EXTRA_FLAGS" --libraries="$LIBRARIES" --bootloader-addr="$BOOTLOADER_ADDR" --locale="$LOCALE"

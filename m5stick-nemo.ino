@@ -3,7 +3,7 @@
 
 // -=-=-=-=-=-=- Uncomment the platform you're building for -=-=-=-=-=-=-
 // #define STICK_C_PLUS
-// #define STICK_C_PLUS2
+#define STICK_C_PLUS2
 // #define STICKS3
 // #define STICK_C
 // #define CARDPUTER
@@ -251,6 +251,7 @@ uint16_t FGCOLOR=0xFFF1; // placeholder
 // 31 - BLE Hunter Alert Packets Setting
 // 32 - Deauth Hunter Alert Packets Setting
 // 33 - PineAP Hunter Alert SSIDs Setting
+// 34 - Auto shutdown timeout
 // 97 - Mount/UnMount SD Card on M5Stick devices, if SDCARD is declared
 
 const String contributors[] PROGMEM = {
@@ -289,6 +290,10 @@ bool activeQR = false;
 const byte PortalTickTimer = 1000;
 String apSsidName = String("");
 bool isSwitching = true;
+bool bleStackReady = false;
+bool ble_hunter_active = false;
+bool displayAsleep = false;
+bool forceClockRedraw = false;
 #if defined(RTC)
   int current_proc = 0; // Start in Clock Mode
 #else
@@ -321,10 +326,16 @@ int dh_pkts = 0;
 #include "localization.h"
 #include <BLEUtils.h>
 #include <BLEServer.h>
+#include <string>
 
 #include "deauth_hunter.h"                                                          //DEAUTH HUNTER
 #include "ble_hunter.h"                                                             //BLE HUNTER
 #include "pineap_hunter.h"                                                          //PINEAP HUNTER
+#include <WiFi.h>
+#include <esp_wifi.h>
+#include <esp_system.h>
+#include <esp_sleep.h>
+#include "joyc.h"
 #if defined(CARDPUTER)
 #include "badusb_hunter.h"                                                          //BADUSB HUNTER
 #endif
@@ -347,58 +358,134 @@ QRCODE qrcodes[] = {
 };
 
 
-void drawmenu(MENU thismenu[], int size) {
+void useMenuFont() {
+  // Clock mode selects font 7. Menus have to switch back to the GLCD font.
   DISP.setTextSize(SMALL_TEXT);
-  DISP.fillScreen(BGCOLOR);
-  DISP.setCursor(0, 0, 1);
-  // scrolling menu
+  DISP.setTextFont(1);
+}
+
+int menuRowHeight() {
+  useMenuFont();
+  int h = DISP.fontHeight();
+  return h < 8 ? 8 : h;
+}
+
+int menuWindowStart(int size, int rows) {
   if (cursor >= size) cursor = 0;
   if (cursor < 0) {
     cursor = size - 1;  // rollover hack for up-arrow on cardputer
   }
-  if (cursor > 5) {
-    for ( int i = 0 + (cursor - 5) ; i < size ; i++ ) {
-      if(cursor == i){
-        DISP.setTextColor(BGCOLOR, FGCOLOR);
-      }
-      DISP.printf(" %-19s\n",thismenu[i].name);
-      DISP.setTextColor(FGCOLOR, BGCOLOR);
-    }
-  } else {
-    for (
-      int i = 0 ; i < size ; i++ ) {
-      if(cursor == i){
-        DISP.setTextColor(BGCOLOR, FGCOLOR);
-      }
-      DISP.printf(" %-19s\n",thismenu[i].name);
-      DISP.setTextColor(FGCOLOR, BGCOLOR);
-    }
+  int start = 0;
+  if (size > rows) {
+    start = cursor - (rows / 2);
+    if (start < 0) start = 0;
+    if (start > size - rows) start = size - rows;
   }
+  return start;
+}
+
+#if defined(STICK_C_PLUS2)
+extern bool joycDebug;
+#endif
+
+void drawJoyStatus(int rowH, bool force = false) {
+#if defined(STICK_C_PLUS2)
+  static int lastX = 999;
+  static int lastY = 999;
+  static int lastBtn = -1;
+  static int lastPresent = -1;
+  static int lastDebug = -1;
+  if (!joycDebug) {
+    if (lastDebug == 1) {
+      int y = DISP.height() - rowH;
+      DISP.fillRect(78, y, DISP.width() - 78, rowH, BGCOLOR);
+    }
+    lastDebug = 0;
+    lastX = 999;
+    return;
+  }
+  lastDebug = 1;
+  int present = joyc.present ? 1 : 0;
+  int bx = joyc.screenX;
+  int by = joyc.screenY;
+  int bb = joyc.button ? 1 : 0;
+  if (!force && present == lastPresent && bx == lastX && by == lastY && bb == lastBtn) {
+    return;
+  }
+  lastPresent = present;
+  lastX = bx;
+  lastY = by;
+  lastBtn = bb;
+  int y = DISP.height() - rowH;
+  DISP.fillRect(78, y, DISP.width() - 78, rowH, BGCOLOR);
+  DISP.setTextColor(FGCOLOR, BGCOLOR);
+  DISP.setCursor(80, y, 1);
+  if (!present) {
+    DISP.print("JOY--");
+  } else {
+    DISP.printf("%d,%d%s", bx, by, bb ? " B" : "");
+  }
+#else
+  (void)rowH;
+  (void)force;
+#endif
+}
+
+void drawMenuChrome(int size, int rows, int rowH) {
+  DISP.setTextColor(FGCOLOR, BGCOLOR);
+  DISP.setCursor(0, DISP.height() - rowH, 1);
+  DISP.printf("%d/%d", cursor + 1, size);
+  drawJoyStatus(rowH, true);
+}
+
+void drawmenu(MENU thismenu[], int size) {
+  if (size < 1) return;
+  int rowH = menuRowHeight();
+  int rows = (DISP.height() - rowH) / rowH;
+  if (rows < 1) rows = 1;
+  int start = menuWindowStart(size, rows);
+  int end = start + rows;
+  if (end > size) end = size;
+
+  useMenuFont();
+  DISP.fillScreen(BGCOLOR);
+  for (int i = start; i < end; i++) {
+    int y = (i - start) * rowH;
+    if (i == cursor) {
+      DISP.fillRect(0, y, DISP.width(), rowH, FGCOLOR);
+      DISP.setTextColor(BGCOLOR, FGCOLOR);
+    } else {
+      DISP.setTextColor(FGCOLOR, BGCOLOR);
+    }
+    DISP.setCursor(2, y, 1);
+    DISP.printf("%-19s", thismenu[i].name);
+  }
+  drawMenuChrome(size, rows, rowH);
 }
 
 void number_drawmenu(int nums) {
-  DISP.setTextSize(SMALL_TEXT);
+  if (nums < 1) return;
+  int rowH = menuRowHeight();
+  int rows = (DISP.height() - rowH) / rowH;
+  if (rows < 1) rows = 1;
+  int start = menuWindowStart(nums, rows);
+  int end = start + rows;
+  if (end > nums) end = nums;
+
+  useMenuFont();
   DISP.fillScreen(BGCOLOR);
-  DISP.setCursor(0, 0);
-  // scrolling menu
-  if (cursor > 5) {
-    for ( int i = 0 + (cursor - 5) ; i < nums ; i++ ) {
-      if(cursor == i){
-        DISP.setTextColor(BGCOLOR, FGCOLOR);
-      }
-      DISP.printf(" %-19d\n",i);
+  for (int i = start; i < end; i++) {
+    int y = (i - start) * rowH;
+    if (i == cursor) {
+      DISP.fillRect(0, y, DISP.width(), rowH, FGCOLOR);
+      DISP.setTextColor(BGCOLOR, FGCOLOR);
+    } else {
       DISP.setTextColor(FGCOLOR, BGCOLOR);
     }
-  } else {
-    for (
-      int i = 0 ; i < nums ; i++ ) {
-      if(cursor == i){
-        DISP.setTextColor(BGCOLOR, FGCOLOR);
-      }
-      DISP.printf(" %-19d\n",i);
-      DISP.setTextColor(FGCOLOR, BGCOLOR);
-    }
+    DISP.setCursor(2, y, 1);
+    DISP.printf("%-19d", i);
   }
+  drawMenuChrome(nums, rows, rowH);
 }
 
 void switcher_button_proc() {
@@ -466,7 +553,39 @@ bool check_next_press(){
   return false;
 }
 
+bool check_prev_press() {
+  joycPoll();
+  if (joycTakePrev()) {
+    dimtimer();
+    return true;
+  }
+  return false;
+}
+
+bool check_joy_next() {
+  joycPoll();
+  if (joycTakeNext()) {
+    dimtimer();
+    return true;
+  }
+  return false;
+}
+
+bool check_back_press() {
+  joycPoll();
+  if (joycTakeBack()) {
+    dimtimer();
+    return true;
+  }
+  return false;
+}
+
 bool check_select_press(){
+  joycPoll();
+  if (joycTakeSelect()) {
+    dimtimer();
+    return true;
+  }
 #if defined(KB)
   M5Cardputer.update();
   if (M5Cardputer.Keyboard.isKeyPressed(KEY_ENTER) || M5Cardputer.Keyboard.isKeyPressed('/')){
@@ -482,24 +601,81 @@ bool check_select_press(){
   return false;
 }
 
+// JoyC repeat is already paced. The side button is level-triggered, so a
+// physical "next" keeps the old 250 ms step. Switcher reads only this path.
+int readMenuDelta() {
+  if (check_prev_press()) {
+    return -1;
+  }
+  if (check_joy_next()) {
+    return 1;
+  }
+  if (check_next_press()) {
+    delay(250);
+    return 1;
+  }
+  return 0;
+}
+
+void applyMenuDelta(int size, int delta) {
+  if (size < 1 || delta == 0) {
+    return;
+  }
+  cursor += delta;
+  while (cursor < 0) cursor += size;
+  while (cursor >= size) cursor -= size;
+}
+
+void waitControlRelease() {
+  joycDiscardEdges();
+  unsigned long start = millis();
+  while (millis() - start < 600) {
+    joycPoll();
+    bool held = joycButtonHeld();
+#if defined(KB)
+    M5Cardputer.update();
+    held = held || M5Cardputer.Keyboard.isPressed();
+#else
+    if (digitalRead(M5_BUTTON_HOME) == LOW) held = true;
+#if M5_BUTTON_RST >= 0
+    if (digitalRead(M5_BUTTON_RST) == LOW) held = true;
+#endif
+#endif
+    if (!held) {
+      joycDiscardEdges();
+      return;
+    }
+    delay(10);
+  }
+  joycDiscardEdges();
+}
+
 // Unified Menu Controller
 class MenuController {
 private:
   MENU* currentMenu;
   int menuSize;
+  int parentProc;
   void (*onExit)();
   void (*onSelect)();
+
+  void goTo(int proc) {
+    rstOverride = false;
+    isSwitching = true;
+    current_proc = proc;
+  }
   
 public:
-  void setup(MENU* menu, int size, void (*exitCallback)() = nullptr, void (*selectCallback)() = nullptr) {
+  void setup(MENU* menu, int size, void (*exitCallback)() = nullptr, void (*selectCallback)() = nullptr, int parent = -1) {
     currentMenu = menu;
     menuSize = size;
+    parentProc = parent;
     onExit = exitCallback;
     onSelect = selectCallback;
     cursor = 0;
     rstOverride = true;  // Always disable switcher when menu is active
     drawmenu(currentMenu, menuSize);
-    delay(500); // Prevent switching after menu loads up
+    waitControlRelease();
   }
   
   // Special setup with initial screen display
@@ -512,11 +688,18 @@ public:
   }
   
   void loop() {
-    if (check_next_press()) {
-      cursor++;
-      cursor = cursor % menuSize;
+    int delta = readMenuDelta();
+    if (delta != 0) {
+      applyMenuDelta(menuSize, delta);
       drawmenu(currentMenu, menuSize);
-      delay(250);
+    } else {
+      drawJoyStatus(menuRowHeight());
+    }
+    if (check_back_press()) {
+      if (parentProc >= 0) {
+        goTo(parentProc);
+        return;
+      }
     }
     if (check_select_press()) {
       if (onSelect) {
@@ -535,21 +718,22 @@ public:
         current_proc = currentMenu[cursor].command;
       }
     }
+    delay(20);
   }
   
   // Special loop for number menus
   void numberLoop(int maxNum) {
-    if (check_next_press()) {
-      cursor++;
-      cursor = cursor % maxNum;
+    int delta = readMenuDelta();
+    if (delta != 0) {
+      applyMenuDelta(maxNum, delta);
       number_drawmenu(maxNum);
-      delay(250);
     }
-    if (check_select_press()) {
+    if (check_back_press() || check_select_press()) {
       rstOverride = false;
       isSwitching = true;
       current_proc = 1; // Usually goes back to main menu
     }
+    delay(20);
   }
 };
 
@@ -572,15 +756,84 @@ MENU mmenu[] = {
 };
 int mmenu_size = sizeof(mmenu) / sizeof(MENU);
 
+void radiosIdle();
+
 void mmenu_setup() {
+  radiosIdle();
   menuController.setup(mmenu, mmenu_size);
 }
 
 bool screen_dim_dimmed = false;
 int screen_dim_time = 30;
 int screen_dim_current = 0;
+int auto_off_minutes = 0;
+bool joycHorizontal = true;
+bool joycClick = false;
+bool joycDebug = false;
+uint32_t lastUserAction = 0;
+
+int normalizeAutoOff(int minutes) {
+  switch (minutes) {
+    case 0:
+    case 1:
+    case 5:
+    case 10:
+    case 30:
+    case 60:
+    case 120:
+      return minutes;
+    default:
+      return 0;
+  }
+}
+
+bool autoOffPaused() {
+  switch (current_proc) {
+    case 5:   // TV-B-Gone
+    case 9:   // BLE advertisement
+    case 11:  // WiFi spam
+    case 14:  // WiFi scan
+    case 17:  // BT maelstrom
+    case 19:  // captive portal
+    case 24:  // Deauth Hunter
+    case 25:  // BLE Hunter
+    case 26:  // PineAP Hunter
+      return true;
+    default:
+      return false;
+  }
+}
+
+void powerDown() {
+  joycLedOff();
+  radiosIdle();
+  DISP.fillScreen(BLACK);
+  delay(80);
+  M5.Power.powerOff();
+  esp_deep_sleep_start();
+}
+
+void auto_off_proc() {
+  if (auto_off_minutes <= 0) {
+    return;
+  }
+  if (autoOffPaused()) {
+    lastUserAction = millis();
+    return;
+  }
+  uint32_t limit = (uint32_t)auto_off_minutes * 60000UL;
+  if (millis() - lastUserAction >= limit) {
+    powerDown();
+  }
+}
 
 void screenBrightness(int bright){
+  if (displayAsleep) {
+    DISP.wakeup();
+    displayAsleep = false;
+    screen_dim_dimmed = false;
+    forceClockRedraw = true;
+  }
   Serial.printf("Brightness: %d\n", bright);
   #if defined(AXP)
     M5.Display.setBrightness(MINBRIGHT + round((float)((255 - MINBRIGHT) * bright / 100)));
@@ -591,14 +844,30 @@ void screenBrightness(int bright){
   #endif
 }
 
+void sleepDisplay() {
+  if (displayAsleep) {
+    return;
+  }
+  #if defined(BACKLIGHT)
+    analogWrite(BACKLIGHT, 0);
+  #elif defined(AXP)
+    M5.Display.setBrightness(0);
+  #endif
+  DISP.sleep();
+  displayAsleep = true;
+  screen_dim_dimmed = true;
+}
+
 int uptime(){
   return(int(millis() / 1000));
 }
 
 void dimtimer(){
-  if(screen_dim_dimmed){
+  lastUserAction = millis();
+  if(screen_dim_dimmed || displayAsleep){
     screenBrightness(brightness);
     screen_dim_dimmed = false;
+    forceClockRedraw = true;
   }
   screen_dim_current = uptime() + screen_dim_time + 2;
 }
@@ -607,8 +876,7 @@ void screen_dim_proc() {
   if(screen_dim_time > 0){
     if (screen_dim_dimmed == false) {
       if (uptime() == screen_dim_current || (uptime() + 1) == screen_dim_current || (uptime() + 2) == screen_dim_current) {
-        screenBrightness(0);
-        screen_dim_dimmed = true;
+        sleepDisplay();
       }
     }
   }
@@ -639,16 +907,24 @@ void dmenu_onSelect() {
   DISP.setCursor(0, 0);
   DISP.println(String(TXT_SET_BRIGHT));
   delay(1000);
+  int savedBrightness = brightness;
   cursor = brightness / 10;
   number_drawmenu(11);
-  while( !check_select_press()) {
-    if (check_next_press()) {
-      cursor++;
-      cursor = cursor % 11 ;
+  while (!check_select_press()) {
+    if (check_back_press()) {
+      screenBrightness(savedBrightness);
+      rstOverride = false;
+      isSwitching = true;
+      current_proc = 2;
+      return;
+    }
+    int delta = readMenuDelta();
+    if (delta != 0) {
+      applyMenuDelta(11, delta);
       number_drawmenu(11);
       screenBrightness(10 * cursor);
-      delay(250);
-     }
+    }
+    delay(20);
   }
   screenBrightness(10 * cursor);
   brightness = 10 * cursor;
@@ -666,8 +942,143 @@ void dmenu_setup() {
   DISP.setCursor(0, 0);
   DISP.println(String(TXT_AUTO_DIM));
   delay(1000);
-  menuController.setup(dmenu, dmenu_size, nullptr, dmenu_onSelect);
+  menuController.setup(dmenu, dmenu_size, nullptr, dmenu_onSelect, 2);
 }
+
+/// AUTO SHUTDOWN ///
+MENU offmenu[] = {
+  { TXT_BACK, 255},
+  { TXT_NEVER, 0},
+  { ("1 " TXT_MIN), 1},
+  { ("5 " TXT_MIN), 5},
+  { ("10 " TXT_MIN), 10},
+  { ("30 " TXT_MIN), 30},
+  { ("60 " TXT_MIN), 60},
+  { ("120 " TXT_MIN), 120},
+};
+int offmenu_size = sizeof(offmenu) / sizeof(MENU);
+
+void offmenu_onSelect() {
+  if (offmenu[cursor].command != 255) {
+    auto_off_minutes = offmenu[cursor].command;
+#if defined(USE_EEPROM)
+    EEPROM.write(11, auto_off_minutes);
+    EEPROM.commit();
+#endif
+  }
+  lastUserAction = millis();
+  rstOverride = false;
+  isSwitching = true;
+  current_proc = 2;
+}
+
+void offmenu_setup() {
+  DISP.fillScreen(BGCOLOR);
+  DISP.setCursor(0, 0);
+  DISP.println(String(TXT_SET_OFF));
+  delay(700);
+  menuController.setup(offmenu, offmenu_size, nullptr, offmenu_onSelect, 2);
+  cursor = 0;
+  for (int i = 0; i < offmenu_size; i++) {
+    if (offmenu[i].command == auto_off_minutes) {
+      cursor = i;
+      break;
+    }
+  }
+  drawmenu(offmenu, offmenu_size);
+}
+
+#if defined(STICK_C_PLUS2)
+MENU joyxmenu[] = {
+  { TXT_BACK, 255},
+  { TXT_ON, 1},
+  { TXT_OFF, 0},
+};
+int joyxmenu_size = sizeof(joyxmenu) / sizeof(MENU);
+
+void joyxmenu_onSelect() {
+  if (joyxmenu[cursor].command != 255) {
+    joycHorizontal = joyxmenu[cursor].command == 1;
+#if defined(USE_EEPROM)
+    EEPROM.write(12, joycHorizontal ? 0 : 2);
+    EEPROM.commit();
+#endif
+  }
+  rstOverride = false;
+  isSwitching = true;
+  current_proc = 2;
+}
+
+void joyxmenu_setup() {
+  DISP.fillScreen(BGCOLOR);
+  DISP.setCursor(0, 0);
+  DISP.println(String(TXT_SET_JOY_LR));
+  delay(700);
+  menuController.setup(joyxmenu, joyxmenu_size, nullptr, joyxmenu_onSelect, 2);
+  cursor = joycHorizontal ? 1 : 2;
+  drawmenu(joyxmenu, joyxmenu_size);
+}
+
+MENU joycmenu[] = {
+  { TXT_BACK, 255},
+  { TXT_ON, 1},
+  { TXT_OFF, 0},
+};
+int joycmenu_size = sizeof(joycmenu) / sizeof(MENU);
+
+void joycmenu_onSelect() {
+  if (joycmenu[cursor].command != 255) {
+    joycClick = joycmenu[cursor].command == 1;
+#if defined(USE_EEPROM)
+    EEPROM.write(13, joycClick ? 1 : 0);
+    EEPROM.commit();
+#endif
+  }
+  rstOverride = false;
+  isSwitching = true;
+  current_proc = 2;
+}
+
+void joycmenu_setup() {
+  DISP.fillScreen(BGCOLOR);
+  DISP.setCursor(0, 0);
+  DISP.println(String(TXT_SET_JOY_CLICK));
+  delay(700);
+  menuController.setup(joycmenu, joycmenu_size, nullptr, joycmenu_onSelect, 2);
+  cursor = joycClick ? 1 : 2;
+  drawmenu(joycmenu, joycmenu_size);
+}
+
+MENU joydmenu[] = {
+  { TXT_BACK, 255},
+  { TXT_ON, 1},
+  { TXT_OFF, 0},
+};
+int joydmenu_size = sizeof(joydmenu) / sizeof(MENU);
+
+void joydmenu_onSelect() {
+  if (joydmenu[cursor].command != 255) {
+    joycDebug = joydmenu[cursor].command == 1;
+#if defined(USE_EEPROM)
+    EEPROM.write(14, joycDebug ? 1 : 0);
+    EEPROM.commit();
+#endif
+  }
+  rstOverride = false;
+  isSwitching = true;
+  current_proc = 2;
+}
+
+void joydmenu_setup() {
+  DISP.fillScreen(BGCOLOR);
+  DISP.setCursor(0, 0);
+  DISP.println(String(TXT_SET_JOY_DEBUG));
+  delay(700);
+  menuController.setup(joydmenu, joydmenu_size, nullptr, joydmenu_onSelect, 2);
+  cursor = joycDebug ? 1 : 2;
+  drawmenu(joydmenu, joydmenu_size);
+}
+#endif
 
 /// SETTINGS MENU ///
 MENU smenu[] = {
@@ -679,6 +1090,12 @@ MENU smenu[] = {
   { TXT_BATT_INFO, 6},
 #endif
   { TXT_BRIGHT, 4},
+  { TXT_AUTO_OFF, 34},
+#if defined(STICK_C_PLUS2)
+  { TXT_JOY_LR, 35},
+  { TXT_JOY_CLICK, 36},
+  { TXT_JOY_DEBUG, 37},
+#endif
 #if defined(RTC)
   { TXT_SET_CLOCK, 3},
 #endif
@@ -724,7 +1141,8 @@ void smenu_onSelect() {
 }
 
 void smenu_setup() {
-  menuController.setup(smenu, smenu_size, nullptr, smenu_onSelect);
+  radiosIdle();
+  menuController.setup(smenu, smenu_size, nullptr, smenu_onSelect, 1);
 }
 
 void clearSettings(){
@@ -859,13 +1277,22 @@ void color_setup() {
 }
 
 void color_loop() {
-  if (check_next_press()) {
+  if (check_back_press()) {
+#if defined(USE_EEPROM)
+    setcolor(true, EEPROM.read(4));
+    setcolor(false, EEPROM.read(5));
+#endif
+    rstOverride = false;
+    isSwitching = true;
+    current_proc = 2;
+    return;
+  }
+  int delta = readMenuDelta();
+  if (delta != 0) {
     setcolor(EEPROM.read(5), false);
-    cursor++;
-    cursor = cursor % cmenu_size;
+    applyMenuDelta(cmenu_size, delta);
     setcolor(true, cursor);
     drawmenu(cmenu, cmenu_size);
-    delay(250);
   }
   if (check_select_press()) {
     #if defined(USE_EEPROM)
@@ -880,14 +1307,24 @@ void color_loop() {
     delay(1000);
     setcolor(false, cursor);
     drawmenu(cmenu, cmenu_size);
-    while( !check_select_press()) {
-      if (check_next_press()) {
-        cursor++;
-        cursor = cursor % cmenu_size ;
+    while (!check_select_press()) {
+      if (check_back_press()) {
+#if defined(USE_EEPROM)
+        setcolor(true, EEPROM.read(4));
+        setcolor(false, EEPROM.read(5));
+#endif
+        rstOverride = false;
+        isSwitching = true;
+        current_proc = 2;
+        return;
+      }
+      int bgDelta = readMenuDelta();
+      if (bgDelta != 0) {
+        applyMenuDelta(cmenu_size, bgDelta);
         setcolor(false, cursor);
         drawmenu(cmenu, cmenu_size);
-        delay(250);
-       }
+      }
+      delay(20);
     }
     #if defined(USE_EEPROM)
       Serial.printf("EEPROM WRITE (5) BGCOLOR: %d\n", cursor);
@@ -898,6 +1335,7 @@ void color_loop() {
     isSwitching = true;
     current_proc = 2;
   }
+  delay(20);
 }
 
 MENU thmenu[] = {
@@ -928,60 +1366,73 @@ void theme_setup() {
 int BG=0;
 int FG=0;
 
+void themePreview() {
+  switch (thmenu[cursor].command){
+    case 0:
+      FG=11;
+      BG=1;
+      break;
+    case 1: // Nemo
+      FG=11;
+      BG=1;
+      break;
+    case 2: // Tux
+      FG=8;
+      BG=1;
+      break;
+    case 3: // Bill
+      FG=16;
+      BG=10;
+      break;
+    case 4: // Steve
+      FG=1;
+      BG=8;
+      break;
+    case 5: // Lilac
+      FG=19;
+      BG=6;
+      break;
+    case 6: // Contrast
+      FG=16;
+      BG=1;
+      break;
+    case 7: // NightShift
+      FG=5;
+      BG=1;
+      break;
+    case 8: // Camo
+      FG=1;
+      BG=7;
+      break;
+    case 9: // BubbleGum
+      FG=1;
+      BG=19;
+      break;
+    case 99:
+      FG=11;
+      BG=1;
+      break;
+  }
+  setcolor(true, FG);
+  setcolor(false, BG);
+}
+
 void theme_loop() {
-  if (check_next_press()) {
-    cursor++;
-    cursor = cursor % thmenu_size;
-    switch (thmenu[cursor].command){
-      case 0:
-        FG=11;
-        BG=1;
-        break;       
-      case 1: // Nemo
-        FG=11;
-        BG=1;
-        break;
-      case 2: // Tux
-        FG=8;
-        BG=1;
-        break;  
-      case 3: // Bill
-        FG=16;
-        BG=10;
-        break;
-      case 4: // Steve
-        FG=1;
-        BG=8;
-        break;        
-      case 5: // Lilac
-        FG=19;
-        BG=6;
-        break;
-      case 6: // Contrast
-        FG=16;
-        BG=1;
-        break;
-      case 7: // NightShift
-        FG=5;
-        BG=1;
-         break;
-      case 8: // Camo
-        FG=1;
-        BG=7;
-        break;
-      case 9: // BubbleGum
-        FG=1;
-        BG=19;
-        break;
-      case 99:
-        FG=11;
-        BG=1;
-        break;
-     }
-    setcolor(true, FG);
-    setcolor(false, BG);
+  if (check_back_press()) {
+#if defined(USE_EEPROM)
+    setcolor(true, EEPROM.read(4));
+    setcolor(false, EEPROM.read(5));
+#endif
+    rstOverride = false;
+    isSwitching = true;
+    current_proc = 2;
+    return;
+  }
+  int delta = readMenuDelta();
+  if (delta != 0) {
+    applyMenuDelta(thmenu_size, delta);
+    themePreview();
     drawmenu(thmenu, thmenu_size);
-    delay(250);
   }
   if (check_select_press()) {
     switch (thmenu[cursor].command){
@@ -1012,6 +1463,7 @@ void theme_loop() {
         current_proc = 2;
     }
   }
+  delay(20);
 }
 
 int rotation = 1;
@@ -1038,7 +1490,7 @@ int rotation = 1;
   }
 
   void rmenu_setup() {
-    menuController.setup(rmenu, rmenu_size, nullptr, rmenu_onSelect);
+    menuController.setup(rmenu, rmenu_size, nullptr, rmenu_onSelect, 2);
   }
 #endif //ROTATION
 
@@ -1052,6 +1504,19 @@ uint16_t getBatteryColor(int battery) {
     return ORANGE;
   } else {
     return GREEN;
+  }
+}
+
+const char* wifiStateLabel() {
+  wifi_mode_t mode;
+  if (esp_wifi_get_mode(&mode) != ESP_OK) {
+    return "off";
+  }
+  switch (mode) {
+    case WIFI_MODE_STA: return "STA";
+    case WIFI_MODE_AP: return "AP";
+    case WIFI_MODE_APSTA: return "AP+STA";
+    default: return "off";
   }
 }
 
@@ -1069,10 +1534,10 @@ void battery_drawmenu(int battery, float voltage_b = 0, float voltage_c = 0) {
   int textSize = SMALL_TEXT;
 #else
   // Large battery bar for Cardputer and StickC Plus* models (240x135 screen)
-  int barX = 10, barY = 20, barW = 220, barH = 40;
-  int textX = 100, textY = 70;
-  int exitY = 120;
-  int textSize = BIG_TEXT;
+  int barX = 10, barY = 4, barW = 220, barH = 26;
+  int textX = 96, textY = 34;
+  int exitY = 118;
+  int textSize = MEDIUM_TEXT;
 #endif
 
   // Draw battery outline
@@ -1094,6 +1559,15 @@ void battery_drawmenu(int battery, float voltage_b = 0, float voltage_c = 0) {
   DISP.setCursor(textX, textY, 1);
   DISP.print(battery);
   DISP.println("%");
+
+#if !defined(STICK_C)
+  DISP.setTextSize(TINY_TEXT);
+  DISP.setCursor(8, textY + 22);
+  float packMv = M5.Power.getBatteryVoltage();
+  DISP.printf("%.2fV  %d MHz", packMv / 1000.0f, getCpuFrequencyMhz());
+  DISP.setCursor(8, textY + 36);
+  DISP.printf("WiFi %s  BLE %s", wifiStateLabel(), bleStackReady ? "on" : "off");
+#endif
     
   // Exit instruction
   DISP.setTextSize(TINY_TEXT);
@@ -1103,30 +1577,41 @@ void battery_drawmenu(int battery, float voltage_b = 0, float voltage_c = 0) {
 }
 
 #if defined(PWRMGMT)
-  int old_battery = 0;
+  int old_battery = -1;
+  int old_mhz = -1;
+  int old_wifi_mode = -1;
+  int old_ble = -1;
 
   int get_battery_voltage() {
     return M5.Power.getBatteryLevel();
   }
 
   void battery_setup() {
+    old_battery = -1;
     int battery = get_battery_voltage();
     battery_drawmenu(battery);
-    delay(500); // Prevent switching after menu loads up
+    waitControlRelease();
   }
 
   void battery_loop() {
     delay(300);
     int battery = get_battery_voltage();
+    int mhz = getCpuFrequencyMhz();
+    wifi_mode_t mode = WIFI_MODE_NULL;
+    esp_wifi_get_mode(&mode);
+    int ble = bleStackReady ? 1 : 0;
 
-    if (battery != old_battery){
+    if (battery != old_battery || mhz != old_mhz || (int)mode != old_wifi_mode || ble != old_ble){
       battery_drawmenu(battery);
+      old_battery = battery;
+      old_mhz = mhz;
+      old_wifi_mode = (int)mode;
+      old_ble = ble;
     }
-    if (check_select_press()) {
+    if (check_select_press() || check_back_press()) {
       isSwitching = true;
       current_proc = 1;
     }
-    old_battery = battery;
   }
 #endif
 
@@ -1153,7 +1638,7 @@ void battery_drawmenu(int battery, float voltage_b = 0, float voltage_c = 0) {
       old_b = b;
       old_c = c;
     }
-    if (check_select_press()) {
+    if (check_select_press() || check_back_press()) {
       rstOverride = false;
       isSwitching = true;
       current_proc = 1;
@@ -1205,6 +1690,7 @@ void battery_drawmenu(int battery, float voltage_b = 0, float voltage_c = 0) {
 
 /// TV-B-GONE ///
 void tvbgone_setup() {
+  radioActive();
   DISP.fillScreen(BGCOLOR);
   DISP.setTextSize(BIG_TEXT);
   DISP.setCursor(0, 0);
@@ -1235,6 +1721,11 @@ void tvbgone_setup() {
 
 void tvbgone_loop()
 {
+  if (check_back_press()) {
+    isSwitching = true;
+    current_proc = 1;
+    return;
+  }
   if (check_select_press()) {
     delay(250);
     Serial.println(TXT_TRIG_TV);
@@ -1281,7 +1772,7 @@ void tvbgmenu_setup() {
   
   // Set initial cursor based on current region
   int initialCursor = region % 2;
-  menuController.setup(tvbgmenu, tvbgmenu_size, nullptr, tvbgmenu_onSelect);
+  menuController.setup(tvbgmenu, tvbgmenu_size, nullptr, tvbgmenu_onSelect, 1);
   // Override the cursor after setup
   cursor = initialCursor;
   drawmenu(tvbgmenu, tvbgmenu_size);
@@ -1354,7 +1845,7 @@ void sendAllCodes() {
     #endif
 #if defined(KB)
 #endif
-    if (check_select_press()){
+    if (check_select_press() || check_back_press()){
       Serial.println("endingearly");
       endingEarly = true;
       delay(250);
@@ -1381,20 +1872,80 @@ void sendAllCodes() {
 
 #if defined(RTC)
   void clock_setup() {
+    radiosIdle();
     DISP.fillScreen(BGCOLOR);
     DISP.setTextSize(1);
+    forceClockRedraw = true;
   }
 
   void clock_loop() {
-    DISP.setCursor(10, 40, 7);
+    static int lastShown = -1;
+    int hour = 0;
+    int minute = 0;
+    int sec = 0;
     #if defined(STICK_C_PLUS2) || defined(STICK_C) || defined(STICK_C_PLUS)
       auto dt = M5.Rtc.getDateTime();
-      DISP.printf("%02d:%02d:%02d\n", dt.time.hours, dt.time.minutes, dt.time.seconds);
+      hour = dt.time.hours;
+      minute = dt.time.minutes;
+      sec = dt.time.seconds;
     #else
       M5.Rtc.GetBm8563Time();
-      DISP.printf("%02d:%02d:%02d\n", M5.Rtc.Hour, M5.Rtc.Minute, M5.Rtc.Second);
+      hour = M5.Rtc.Hour;
+      minute = M5.Rtc.Minute;
+      sec = M5.Rtc.Second;
     #endif
-    check_select_press();
+    bool clockCleared = forceClockRedraw;
+    if (forceClockRedraw || sec != lastShown) {
+      if (forceClockRedraw) {
+        DISP.fillScreen(BGCOLOR);
+      }
+      forceClockRedraw = false;
+      lastShown = sec;
+      DISP.setTextColor(FGCOLOR, BGCOLOR);
+      DISP.setCursor(10, 40, 7);
+      DISP.printf("%02d:%02d:%02d\n", hour, minute, sec);
+    }
+    static int joyShownX = 999;
+    static int joyShownY = 999;
+    static int joyShownBtn = -1;
+    static int joyShownPresent = -1;
+    static int joyShownDebug = -1;
+    if (!joycDebug) {
+      if (joyShownDebug == 1 && !clockCleared) {
+        DISP.fillRect(0, DISP.height() - 16, DISP.width(), 16, BGCOLOR);
+      }
+      joyShownDebug = 0;
+      joyShownX = 999;
+    } else {
+    joyShownDebug = 1;
+    int joyPresent = joyc.present ? 1 : 0;
+    int joyX = joyc.screenX;
+    int joyY = joyc.screenY;
+    int joyBtn = joyc.button ? 1 : 0;
+    if (clockCleared || joyPresent != joyShownPresent || joyX != joyShownX ||
+        joyY != joyShownY || joyBtn != joyShownBtn) {
+      joyShownPresent = joyPresent;
+      joyShownX = joyX;
+      joyShownY = joyY;
+      joyShownBtn = joyBtn;
+      DISP.fillRect(0, DISP.height() - 16, DISP.width(), 16, BGCOLOR);
+      DISP.setTextColor(FGCOLOR, BGCOLOR);
+      DISP.setCursor(4, DISP.height() - 14, 1);
+      if (!joyPresent) {
+        DISP.print("JOY--");
+      } else {
+        DISP.printf("JOY %d %d%s", joyX, joyY, joyBtn ? " B" : "");
+      }
+    }
+    }
+    // Any stick move leaves the clock. Up/down/click used to be ignored here,
+    // so the joystick looked dead on the screen the Stick boots into.
+    if (check_select_press() || check_back_press() || check_prev_press() || check_joy_next()) {
+      isSwitching = true;
+      current_proc = 1;
+      return;
+    }
+    delay(20);
   }
 
   /// TIME SETTING ///
@@ -1406,6 +1957,24 @@ void sendAllCodes() {
     delay(2000);
   }
 
+  bool timeset_pick(int maxn) {
+    number_drawmenu(maxn);
+    while (true) {
+      if (check_back_press()) {
+        return false;
+      }
+      if (check_select_press()) {
+        return true;
+      }
+      int delta = readMenuDelta();
+      if (delta != 0) {
+        applyMenuDelta(maxn, delta);
+        number_drawmenu(maxn);
+      }
+      delay(20);
+    }
+  }
+
   void timeset_loop() {
   #if defined(STICK_C_PLUS2) || defined(STICK_C) || defined(STICK_C_PLUS)
     auto dt = M5.Rtc.getDateTime();
@@ -1414,14 +1983,11 @@ void sendAllCodes() {
     M5.Rtc.GetBm8563Time();
     cursor = M5.Rtc.Hour;
   #endif
-    number_drawmenu(24);
-    while(digitalRead(M5_BUTTON_HOME) == HIGH) {
-      if (check_next_press()) {
-        cursor++;
-        cursor = cursor % 24 ;
-        number_drawmenu(24);
-        delay(100);
-      }
+    if (!timeset_pick(24)) {
+      rstOverride = false;
+      isSwitching = true;
+      current_proc = 2;
+      return;
     }
     int hour = cursor;
     DISP.fillScreen(BGCOLOR);
@@ -1433,14 +1999,11 @@ void sendAllCodes() {
     #else
       cursor = M5.Rtc.Minute;
     #endif
-    number_drawmenu(60);
-    while(digitalRead(M5_BUTTON_HOME) == HIGH) {
-      if (check_next_press()) {
-        cursor++;
-        cursor = cursor % 60 ;
-        number_drawmenu(60);
-        delay(100);
-      }
+    if (!timeset_pick(60)) {
+      rstOverride = false;
+      isSwitching = true;
+      current_proc = 2;
+      return;
     }
     int minute = cursor;
     DISP.fillScreen(BGCOLOR);
@@ -1476,6 +2039,7 @@ MENU btmenu[] = {
 int btmenu_size = sizeof(btmenu) / sizeof (MENU);
 
 void btmenu_setup() {
+  radiosIdle();
   cursor = 0;
   sourApple = false;
   swiftPair = false;
@@ -1483,15 +2047,20 @@ void btmenu_setup() {
   androidPair = false;
   rstOverride = true;
   drawmenu(btmenu, btmenu_size);
-  delay(500); // Prevent switching after menu loads up
+  waitControlRelease();
 }
 
 void btmenu_loop() {
-  if (check_next_press()) {
-    cursor++;
-    cursor = cursor % btmenu_size;
+  if (check_back_press()) {
+    rstOverride = false;
+    isSwitching = true;
+    current_proc = 1;
+    return;
+  }
+  int delta = readMenuDelta();
+  if (delta != 0) {
+    applyMenuDelta(btmenu_size, delta);
     drawmenu(btmenu, btmenu_size);
-    delay(250);
   }
   if (check_select_press()) {
     int option = btmenu[cursor].command;
@@ -1593,6 +2162,7 @@ MENU ajmenu[] = {
 int ajmenu_size = sizeof(ajmenu) / sizeof (MENU);
 
 void aj_setup(){
+  radiosIdle();
   DISP.fillScreen(BGCOLOR);
   DISP.setTextSize(MEDIUM_TEXT);
   DISP.setCursor(0, 0);
@@ -1610,11 +2180,16 @@ void aj_setup(){
 
 void aj_loop(){
   if (!maelstrom){
-    if (check_next_press()) {
-      cursor++;
-      cursor = cursor % ajmenu_size;
+    if (check_back_press()) {
+      rstOverride = false;
+      isSwitching = true;
+      current_proc = 1;
+      return;
+    }
+    int delta = readMenuDelta();
+    if (delta != 0) {
+      applyMenuDelta(ajmenu_size, delta);
       drawmenu(ajmenu, ajmenu_size);
-      delay(100);
     }
   }
   if (check_select_press() || maelstrom) {
@@ -1741,6 +2316,7 @@ void aj_adv(){
   // run the advertising loop
   // Isolating this to its own process lets us take advantage 
   // of the background stuff easier (menu button, dimmer, etc)
+  ensureBle();
   rstOverride = true;
   if (sourApple || swiftPair || androidPair || maelstrom){
     delay(20);   // 20msec delay instead of ajDelay for SourApple attack
@@ -1773,7 +2349,7 @@ void aj_adv(){
       packet[i++] = 0x00;  // ???
       packet[i++] =  0x10;  // Type ???
       esp_fill_random(&packet[i], 3);
-      oAdvertisementData.addData(String((char *)packet, 17));
+      oAdvertisementData.addData(std::string((char *)packet, 17));
       for (int i = 0; i < sizeof packet; i ++) {
         Serial.printf("%02x", packet[i]);
       }
@@ -1800,7 +2376,7 @@ void aj_adv(){
         Serial.printf("%02x", packet[k]);
       }
       Serial.println("");
-      oAdvertisementData.addData(String((char *)packet, size));
+      oAdvertisementData.addData(std::string((char *)packet, size));
       free(packet);
       free((void*)display_name);
     } else if (androidPair) {
@@ -1823,7 +2399,7 @@ void aj_adv(){
       packet[i++] = 0x0A; // AD Type (Tx Power Level)
       packet[i++] = (rand() % 120) - 100; // -100 to +20 dBm
 
-      oAdvertisementData.addData(String((char *)packet, 14));
+      oAdvertisementData.addData(std::string((char *)packet, 14));
       for (int i = 0; i < sizeof packet; i ++) {
         Serial.printf("%02x", packet[i]);
       }
@@ -1831,9 +2407,9 @@ void aj_adv(){
     } else {
       Serial.print(TXT_AJ_ADV);
       if (deviceType >= 18){
-        oAdvertisementData.addData(String((char*)data, sizeof(AppleTVPair)));
+        oAdvertisementData.addData(std::string((char*)data, sizeof(AppleTVPair)));
       } else {
-        oAdvertisementData.addData(String((char*)data, sizeof(Airpods)));
+        oAdvertisementData.addData(std::string((char*)data, sizeof(Airpods)));
       }
       for (int i = 0; i < sizeof(Airpods); i ++) {
         Serial.printf("%02x", data[i]);
@@ -1849,7 +2425,7 @@ void aj_adv(){
     digitalWrite(M5LED, M5LED_OFF); //LED OFF on Stick C Plus
 #endif
   }
-  if (check_next_press()) {
+  if (check_next_press() || check_back_press()) {
     if (sourApple || swiftPair || androidPair || maelstrom){
       isSwitching = true;
       current_proc = 16;
@@ -1862,7 +2438,11 @@ void aj_adv(){
     sourApple = false;
     swiftPair = false;
     maelstrom = false;
-    pAdvertising->stop(); // Bug that keeps advertising in the background. Oops.
+    androidPair = false;
+    if (pAdvertising) {
+      pAdvertising->stop(); // Bug that keeps advertising in the background. Oops.
+    }
+    releaseBle();
     delay(250);
   }
 }
@@ -1890,6 +2470,11 @@ void credits_setup(){
 }
 
 void credits_loop(){
+  if (check_back_press()) {
+    isSwitching = true;
+    current_proc = 1;
+    return;
+  }
   if(millis() > advtime){
     DISP.setTextColor(BLACK, WHITE);  
     DISP.setCursor(0, 115);
@@ -1905,6 +2490,7 @@ void credits_loop(){
 
 /// WiFiSPAM ///
 void wifispam_setup() {
+  radioActive();
   // create empty SSID
   for (int i = 0; i < 32; i++)
     emptySSID[i] = ' ';
@@ -1957,6 +2543,11 @@ void wifispam_setup() {
 }
 
 void wifispam_loop() {
+  if (check_back_press()) {
+    isSwitching = true;
+    current_proc = 1;
+    return;
+  }
   int i = 0;
   int len = 0;
 #if defined(M5LED)
@@ -1991,6 +2582,7 @@ void wifispam_loop() {
 }
 
 void btmaelstrom_setup(){
+  radioActive();
   rstOverride = false;
   maelstrom = true;
 }
@@ -2034,18 +2626,24 @@ MENU wsmenu[] = {
 int wsmenu_size = sizeof(wsmenu) / sizeof (MENU);
 
 void wsmenu_setup() {
+  radiosIdle();
   cursor = 0;
   rstOverride = true;
   drawmenu(wsmenu, wsmenu_size);
-  delay(500); // Prevent switching after menu loads up
+  waitControlRelease();
 }
 
 void wsmenu_loop() {
-  if (check_next_press()) {
-    cursor++;
-    cursor = cursor % wsmenu_size;
+  if (check_back_press()) {
+    rstOverride = false;
+    isSwitching = true;
+    current_proc = 1;
+    return;
+  }
+  int delta = readMenuDelta();
+  if (delta != 0) {
+    applyMenuDelta(wsmenu_size, delta);
     drawmenu(wsmenu, wsmenu_size);
-    delay(250);
   }
   if (check_select_press()) {
     int option = wsmenu[cursor].command;
@@ -2124,15 +2722,20 @@ void wscan_result_setup() {
   cursor = 0;
   rstOverride = true;
   wscan_drawmenu();
-  delay(500); // Prevent switching after menu loads up
+  waitControlRelease();
 }
 
 void wscan_result_loop(){
-  if (check_next_press()) {
-    cursor++;
-    cursor = cursor % ( wifict + 2);
+  if (check_back_press()) {
+    rstOverride = false;
+    isSwitching = true;
+    current_proc = 12;
+    return;
+  }
+  int delta = readMenuDelta();
+  if (delta != 0) {
+    applyMenuDelta(wifict + 2, delta);
     wscan_drawmenu();
-    delay(250);
   }
   if (check_select_press()) {
     delay(250);
@@ -2200,6 +2803,8 @@ void wscan_result_loop(){
 }
 
 void wscan_setup(){
+  radioActive();
+  WiFi.mode(WIFI_STA);
   rstOverride = false;  
   cursor = 0;
   DISP.fillScreen(BGCOLOR);
@@ -2275,19 +2880,30 @@ void qrmenu_drawmenu() {
 }
 
 void qrmenu_setup() {
+  radiosIdle();
   cursor = 0;
   rstOverride = true;
   qrmenu_drawmenu();
-  delay(500); // Prevent switching after menu loads up
+  waitControlRelease();
 }
 
 void qrmenu_loop() {
-  if (check_next_press()) {
-    cursor++;
-    cursor = cursor % ( sizeof(qrcodes) / sizeof(QRCODE) );
+  int qrCount = sizeof(qrcodes) / sizeof(QRCODE);
+  if (check_back_press()) {
+    if (activeQR) {
+      activeQR = false;
+      qrmenu_drawmenu();
+    } else {
+      isSwitching = true;
+      current_proc = 1;
+    }
+    return;
+  }
+  int delta = readMenuDelta();
+  if (delta != 0) {
+    applyMenuDelta(qrCount, delta);
     qrmenu_drawmenu();
     activeQR = false;
-    delay(250);
   }
   if (check_select_press()) {
     if (qrcodes[cursor].url.length() < 1){
@@ -2309,6 +2925,7 @@ void qrmenu_loop() {
 /// NEMO PORTAL
 
 void portal_setup(){
+  radioActive();
   setupWiFi();
   setupWebServer();
   portal_active = true;
@@ -2332,20 +2949,73 @@ void portal_loop(){
   dnsServer.processNextRequest();
   webServer.handleClient();
   
-  if (check_next_press()){
+  if (check_next_press() || check_back_press()){
     shutdownWebServer();
     portal_active = false;
     clone_flg = false;
+    isSwitching = true;
     current_proc = 12;
     delay(500);
   }
   check_select_press();
 }
 
+void stop_ble_monitoring();
+
+void radioActive() {
+  setCpuFrequencyMhz(240);
+}
+
+void ensureBle() {
+  radioActive();
+  if (ble_hunter_active) {
+    stop_ble_monitoring();
+  }
+  if (bleStackReady && pAdvertising) {
+    return;
+  }
+  BLEDevice::init("");
+  BLEServer *pServer = BLEDevice::createServer();
+  pAdvertising = pServer->getAdvertising();
+  bleStackReady = true;
+}
+
+void releaseBle() {
+  if (ble_hunter_active) {
+    stop_ble_monitoring();
+    return;
+  }
+  if (!bleStackReady) {
+    return;
+  }
+  if (pAdvertising) {
+    pAdvertising->stop();
+  }
+  BLEDevice::deinit(false);
+  pAdvertising = nullptr;
+  bleStackReady = false;
+}
+
+void radiosIdle() {
+  wifi_mode_t mode = WIFI_MODE_NULL;
+  if (esp_wifi_get_mode(&mode) == ESP_OK && mode != WIFI_MODE_NULL) {
+    esp_wifi_set_promiscuous(false);
+    WiFi.disconnect(true);
+    WiFi.mode(WIFI_OFF);
+  }
+  releaseBle();
+  joycLedOff();
+  setCpuFrequencyMhz(80);
+}
+
 /// ENTRY ///
 void setup() {
 Serial.begin(115200);
-#if defined(CARDPUTER)
+#if defined(STICK_C_PLUS2)
+  auto cfg = M5.config();
+  cfg.internal_mic = false; // G0 is the SPM1423 clock and the JoyC SDA
+  M5.begin(cfg);
+#elif defined(CARDPUTER)
   auto cfg = M5.config();
   M5Cardputer.begin(cfg, true);
 #else
@@ -2389,11 +3059,19 @@ Serial.begin(115200);
       EEPROM.write(8, 20);   // -20 RSSI Max for Deauth Hunter
       EEPROM.write(9, 50);   // > 50 Pkts triggers Deauth Hunter Alert
       EEPROM.write(10, 5);   // >= 5 SSIDs per BSSID Triggers PineAP Hunter Alert
+      EEPROM.write(11, 0);   // Auto shutdown disabled
+      EEPROM.write(12, 0);   // Joy left/right enabled
+      EEPROM.write(13, 0);   // Joy click disabled
+      EEPROM.write(14, 0);   // Joy debug hidden
       EEPROM.commit();
     }
     rotation = EEPROM.read(0);
     screen_dim_time = EEPROM.read(1);
     brightness = EEPROM.read(2);
+    auto_off_minutes = normalizeAutoOff(EEPROM.read(11));
+    joycHorizontal = EEPROM.read(12) != 2;
+    joycClick = EEPROM.read(13) == 1;
+    joycDebug = EEPROM.read(14) == 1;
     region = EEPROM.read(3);
     setcolor(true, EEPROM.read(4));
     setcolor(false, EEPROM.read(5));
@@ -2420,20 +3098,19 @@ Serial.begin(115200);
 #if defined(M5_BUTTON_MENU)
   pinMode(M5_BUTTON_MENU, INPUT);
 #endif
-  // Random seed
-  randomSeed(analogRead(0));
+  // GPIO 0 is the JoyC SDA on Plus2. Don't analogRead it.
+  randomSeed(esp_random());
 
-  // Create the BLE Server
-  BLEDevice::init("");
-  BLEServer *pServer = BLEDevice::createServer();
-  pAdvertising = pServer->getAdvertising();
-  BLEAdvertisementData oAdvertisementData = BLEAdvertisementData();
+#if defined(STICK_C_PLUS2)
+  joycBegin();
+#endif
 
   // Nemo Portal Init
   setupSdCard();
   bootTime = lastActivity = millis();
 
   screenBrightness(brightness);
+  lastUserAction = millis();
   dimtimer();
   DISP.setRotation(rotation);
   DISP.setTextColor(FGCOLOR, BGCOLOR);
@@ -2464,6 +3141,12 @@ ProcessHandler processes[] = {
   {3, timeset_setup, timeset_loop, "Time Settings"},
 #endif
   {4, dmenu_setup, menu_controller_loop, "Display Menu"},
+  {34, offmenu_setup, menu_controller_loop, "Auto Off"},
+#if defined(STICK_C_PLUS2)
+  {35, joyxmenu_setup, menu_controller_loop, "Joy Left/Right"},
+  {36, joycmenu_setup, menu_controller_loop, "Joy Click"},
+  {37, joydmenu_setup, menu_controller_loop, "Joy Debug"},
+#endif
   {5, tvbgone_setup, tvbgone_loop, "TV-B-Gone"},
 #if defined(AXP) || defined(PWRMGMT) || defined(CARDPUTER)
   {6, battery_setup, battery_loop, "Battery Info"},
@@ -2529,8 +3212,17 @@ void runCurrentLoop() {
 void loop() {
   // This is the code to handle running the main loops
   // Background processes
+  bool wasAsleep = displayAsleep || screen_dim_dimmed;
+  joycPoll();
+  if (joycOutOfDeadzone()) {
+    dimtimer();
+    if (wasAsleep) {
+      joycDiscardEdges();
+    }
+  }
   switcher_button_proc();
   screen_dim_proc();
+  auto_off_proc();
   check_menu_press();
   
   // Switcher - unified process handler
@@ -2714,6 +3406,7 @@ void stop_deauth_monitoring() {
 
 // Deauth Hunter setup function
 void deauth_hunter_setup() {
+  radioActive();
   DISP.fillScreen(BGCOLOR);
   DISP.setTextSize(SMALL_TEXT);
   DISP.setTextColor(FGCOLOR, BGCOLOR);
@@ -2732,7 +3425,7 @@ void deauth_hunter_setup() {
 // Deauth Hunter main loop
 void deauth_hunter_loop() {
   // Handle button input for exit
-  if (check_next_press()) {
+  if (check_next_press() || check_back_press()) {
     stop_deauth_monitoring();
     isSwitching = true;
     current_proc = 12; // Return to WiFi menu
@@ -2794,7 +3487,6 @@ void deauth_hunter_loop() {
 // Global variables for BLE Hunter
 BLEStats ble_stats;
 BLEScan* ble_scanner = nullptr;
-bool ble_hunter_active = false;
 bool ble_channel_hop_pause = false;
 std::vector<BLEDeviceInfo> seen_ble_devices;
 
@@ -2880,9 +3572,19 @@ String detect_device_type(const String& mac, const String& name) {
 // Start BLE monitoring
 void start_ble_monitoring() {
   if (ble_hunter_active) return;
-  
-  // Initialize BLE
+
+  radioActive();
+  if (bleStackReady) {
+    if (pAdvertising) {
+      pAdvertising->stop();
+    }
+    BLEDevice::deinit(false);
+    pAdvertising = nullptr;
+    bleStackReady = false;
+  }
+
   BLEDevice::init("");
+  bleStackReady = true;
   ble_scanner = BLEDevice::getScan();
   ble_scanner->setAdvertisedDeviceCallbacks(new BLEHunterCallback());
   ble_scanner->setActiveScan(true);
@@ -2899,8 +3601,10 @@ void stop_ble_monitoring() {
     ble_scanner->stop();
     ble_scanner->clearResults();
   }
-  BLEDevice::deinit();
-  
+  BLEDevice::deinit(false);
+  pAdvertising = nullptr;
+  bleStackReady = false;
+  ble_scanner = nullptr;
   ble_hunter_active = false;
 }
 
@@ -2955,7 +3659,7 @@ void ble_hunter_setup() {
 // BLE Hunter main loop
 void ble_hunter_loop() {
   // Handle button input for exit
-  if (check_next_press()) {
+  if (check_next_press() || check_back_press()) {
     stop_ble_monitoring();
     isSwitching = true;
     current_proc = 16; // Return to Bluetooth menu
@@ -3025,6 +3729,8 @@ bool pineap_hunter_active = false;
 uint32_t last_beep_time = 0;
 
 void pineap_hunter_setup() {
+  radioActive();
+  WiFi.mode(WIFI_STA);
   pineap_hunter_active = true;
   pineap_hunter_stats = PineAPHunterStats();
   pineap_hunter_stats.scan_cycle_start = millis();
@@ -3074,19 +3780,18 @@ void handle_main_list_input() {
     last_beep_time = millis();
   }
 
-  if (check_next_press()) {
-    // Always allow cursor navigation - total items = detected pineaps + 1 ("Back")
-    int total_items = pineap_hunter_stats.detected_pineaps.size() + 1;
-    cursor++;
+  if (check_back_press()) {
+    pineap_hunter_cleanup();
+    isSwitching = true;
+    current_proc = 12;
+    return;
+  }
 
-    // Handle negative cursor values by jumping to end of list
-    if (cursor < 0) {
-      cursor = total_items - 1;
-    } else {
-      cursor %= total_items;
-    }
+  int total_items = pineap_hunter_stats.detected_pineaps.size() + 1;
+  int delta = readMenuDelta();
+  if (delta != 0) {
+    applyMenuDelta(total_items, delta);
     update_display();
-    delay(250);
   }
 
   if (check_select_press()) {
@@ -3108,6 +3813,12 @@ void handle_main_list_input() {
 
 void handle_bssid_details_input() {
   // Future enhancement - for now unused
+  if (check_back_press()) {
+    pineap_hunter_stats.view_mode = 0;
+    update_display();
+    delay(250);
+    return;
+  }
   if (check_next_press() || check_select_press()) {
     pineap_hunter_stats.view_mode = 2; // Go to SSID list
     cursor = 0; // Reset cursor for SSID list
@@ -3117,21 +3828,20 @@ void handle_bssid_details_input() {
 }
 
 void handle_ssid_list_input() {
-  if (check_next_press()) {
-    if (pineap_hunter_stats.selected_bssid_index < pineap_hunter_stats.detected_pineaps.size()) {
-      const auto& pine = pineap_hunter_stats.detected_pineaps[pineap_hunter_stats.selected_bssid_index];
-      int total_items = pine.essids.size() + 1; // +1 for "Back"
-      cursor++;
-
-      // Handle negative cursor values by jumping to end of list
-      if (cursor < 0) {
-        cursor = total_items - 1;
-      } else {
-        cursor %= total_items;
-      }
-    }
+  if (check_back_press()) {
+    pineap_hunter_stats.view_mode = 0;
+    cursor = pineap_hunter_stats.selected_bssid_index;
     update_display();
-    delay(250);
+    return;
+  }
+  if (pineap_hunter_stats.selected_bssid_index < pineap_hunter_stats.detected_pineaps.size()) {
+    const auto& pine = pineap_hunter_stats.detected_pineaps[pineap_hunter_stats.selected_bssid_index];
+    int total_items = pine.essids.size() + 1; // +1 for "Back"
+    int delta = readMenuDelta();
+    if (delta != 0) {
+      applyMenuDelta(total_items, delta);
+      update_display();
+    }
   }
 
   if (check_select_press()) {
@@ -3459,16 +4169,18 @@ void bh_rssi_loop() {
   DISP.printf("Current: %d dBm\n", bh_rssi_threshold);
   DISP.println("Range: -10 to -100");
   
-  if (check_next_press()) {
-    cursor++;
-    cursor = cursor % 19; // 0-18 for -100 to -10 in steps of 5
+  int delta = readMenuDelta();
+  if (delta != 0) {
+    applyMenuDelta(19, delta);
     bh_rssi_threshold = -100 + (cursor * 5);
     DISP.fillScreen(BGCOLOR);
-    DISP.setCursor(0, 0);
-    DISP.printf("BH RSSI: %d dBm", bh_rssi_threshold);
-    delay(250);
-    DISP.fillScreen(BGCOLOR);
+  }
 
+  if (check_back_press()) {
+    rstOverride = false;
+    isSwitching = true;
+    current_proc = 2;
+    return;
   }
   
   if (check_select_press()) {
@@ -3514,11 +4226,18 @@ void dh_rssi_loop() {
   DISP.printf("Current: %d dBm\n", dh_rssi_threshold);
   DISP.println("Range: -10 to -100");
   
-  if (check_next_press()) {
-    cursor++;
-    cursor = cursor % 19; // 0-18 for -100 to -10 in steps of 5
+  int delta = readMenuDelta();
+  if (delta != 0) {
+    applyMenuDelta(19, delta);
     dh_rssi_threshold = -100 + (cursor * 5);
-    delay(250);
+    DISP.fillScreen(BGCOLOR);
+  }
+
+  if (check_back_press()) {
+    rstOverride = false;
+    isSwitching = true;
+    current_proc = 2;
+    return;
   }
   
   if (check_select_press()) {
@@ -3559,14 +4278,18 @@ void bh_alert_pkts_loop() {
   DISP.printf("Current: %3d\n", bh_alert_pkts);
   DISP.println("Range: 0-100");
   
-  if (check_next_press()) {
-    cursor++;
-    cursor = cursor % 101; // 0-100
-        if (cursor < 0) {
-      cursor = 99;
-    }
+  int delta = readMenuDelta();
+  if (delta != 0) {
+    applyMenuDelta(101, delta);
     bh_alert_pkts = cursor;
-    delay(250);
+    DISP.fillScreen(BGCOLOR);
+  }
+
+  if (check_back_press()) {
+    rstOverride = false;
+    isSwitching = true;
+    current_proc = 2;
+    return;
   }
   
   if (check_select_press()) {
@@ -3606,14 +4329,18 @@ void dh_alert_pkts_loop() {
   DISP.printf("Current: %3d\n", dh_alert_pkts);
   DISP.println("Range: 0-100");
   
-  if (check_next_press()) {
-    cursor++;
-    cursor = cursor % 101; // 0-100  
-    if (cursor < 0) {
-      cursor = 99;
-    }
+  int delta = readMenuDelta();
+  if (delta != 0) {
+    applyMenuDelta(101, delta);
     dh_alert_pkts = cursor;
-    delay(250);
+    DISP.fillScreen(BGCOLOR);
+  }
+
+  if (check_back_press()) {
+    rstOverride = false;
+    isSwitching = true;
+    current_proc = 2;
+    return;
   }
   
   if (check_select_press()) {
@@ -3654,13 +4381,20 @@ void ph_alert_ssids_loop() {
   DISP.printf("Current: %3d\n", ph_alert_ssids);
   DISP.println("Range: 2-100");
 
-  if (check_next_press()) {
-    cursor++;
-    if (cursor > 100) {
-      cursor = 2; // Wrap to minimum
-    }
+  int delta = readMenuDelta();
+  if (delta != 0) {
+    cursor += delta;
+    if (cursor > 100) cursor = 2;
+    if (cursor < 2) cursor = 100;
     ph_alert_ssids = cursor;
-    delay(250);
+    DISP.fillScreen(BGCOLOR);
+  }
+
+  if (check_back_press()) {
+    rstOverride = false;
+    isSwitching = true;
+    current_proc = 2;
+    return;
   }
 
   if (check_select_press()) {
