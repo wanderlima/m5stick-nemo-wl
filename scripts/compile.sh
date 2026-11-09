@@ -61,7 +61,7 @@ arduino-cli compile --log \
   --build-property upload.maximum_size=3145728 \
   --build-property compiler.cpp.extra_flags="${extra_flags}" \
   --output-dir ./m5stick-nemo/build \
-  ./m5stick-nemo/m5stick-nemo.ino
+  ./m5stick-nemo/src/m5stick-nemo/m5stick-nemo.ino
 
 if [[ "${locale}" == "en-us" ]]; then
   output_file="M5Nemo-${name}.bin"

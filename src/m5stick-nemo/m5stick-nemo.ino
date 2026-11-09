@@ -316,28 +316,28 @@ int dh_pkts = 0;
 #include <IRremote.h>
 #include <DNSServer.h>
 #include <WebServer.h>
-#include "applejuice.h"
-#include "WORLD_IR_CODES.h"
-#include "wifispam.h"
-#include "sd.h"
-#include "portal.h"
-#include "NEMOMatrix.h"
-#include "songs.h"
-#include "localization.h"
+#include "ble/applejuice.h"
+#include "ir/WORLD_IR_CODES.h"
+#include "wifi/wifispam.h"
+#include "storage/sd.h"
+#include "wifi/portal.h"
+#include "assets/NEMOMatrix.h"
+#include "assets/songs.h"
+#include "i18n/localization.h"
 #include <BLEUtils.h>
 #include <BLEServer.h>
 #include <string>
 
-#include "deauth_hunter.h"                                                          //DEAUTH HUNTER
-#include "ble_hunter.h"                                                             //BLE HUNTER
-#include "pineap_hunter.h"                                                          //PINEAP HUNTER
+#include "wifi/deauth_hunter.h"                                                     //DEAUTH HUNTER
+#include "ble/ble_hunter.h"                                                         //BLE HUNTER
+#include "wifi/pineap_hunter.h"                                                     //PINEAP HUNTER
 #include <WiFi.h>
 #include <esp_wifi.h>
 #include <esp_system.h>
 #include <esp_sleep.h>
-#include "joyc.h"
+#include "input/joyc.h"
 #if defined(CARDPUTER)
-#include "badusb_hunter.h"                                                          //BADUSB HUNTER
+#include "usb/badusb_hunter.h"                                                      //BADUSB HUNTER
 #endif
 struct MENU {
   char name[19];
