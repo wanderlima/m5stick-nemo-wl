@@ -85,10 +85,10 @@ void badusb_hunter_loop() {
 ### File Structure
 
 ```
-m5stick-nemo/
-├── badusb_hunter.h          # Header (minimal - structs & declarations only)
+src/m5stick-nemo/
+├── usb/badusb_hunter.h      # Header (minimal - structs & declarations only)
 └── m5stick-nemo.ino         # Main file
-    ├── Line 290: #include "badusb_hunter.h"
+    ├── Line 290: #include "usb/badusb_hunter.h"
     ├── Line 517: Menu item (CARDPUTER only)
     ├── Line 2586: Process registration (CARDPUTER only)
     └── Lines 3784-4147: Full implementation

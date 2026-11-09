@@ -89,14 +89,14 @@ arduino-cli compile --fqbn "$FQBN" -e \
                     --build-property build.partitions=huge_app \
                     --build-property upload.maximum_size=3145728 \
                     --build-property "compiler.cpp.extra_flags=$EXTRA_FLAGS" \
-                    ./m5stick-nemo.ino
+                    ./src/m5stick-nemo/m5stick-nemo.ino
 
 echo
 echo "=== Compilation completed successfully! ==="
-echo "Binary location: build/$FQBN/"
+echo "Binary location: src/m5stick-nemo/build/$FQBN/"
 
 # Show build results
-if [ -f "build/${FQBN//:/.}/m5stick-nemo.ino.bin" ]; then
-    echo "Firmware binary: build/${FQBN//:/.}/m5stick-nemo.ino.bin"
-    ls -la "build/${FQBN//:/.}"/m5stick-nemo.ino.*
+if [ -f "src/m5stick-nemo/build/${FQBN//:/.}/m5stick-nemo.ino.bin" ]; then
+    echo "Firmware binary: src/m5stick-nemo/build/${FQBN//:/.}/m5stick-nemo.ino.bin"
+    ls -la "src/m5stick-nemo/build/${FQBN//:/.}"/m5stick-nemo.ino.*
 fi

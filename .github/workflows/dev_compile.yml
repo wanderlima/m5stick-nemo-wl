@@ -125,7 +125,7 @@ jobs:
                               --build-property build.partitions=huge_app \
                               --build-property upload.maximum_size=3145728 \
                               --build-property compiler.cpp.extra_flags="${extra_flags}" \
-                              ./m5stick-nemo.ino
+                              ./src/m5stick-nemo/m5stick-nemo.ino
       
       - name: Create ${{ matrix.board.name }} Firmware Binary
         run: |
@@ -144,9 +144,9 @@ jobs:
           directory="${fqbn//:/.}"
 
           esptool.py --chip esp32s3 merge_bin --output ${output_file}  \
-            ${{ matrix.board.partitions.bootloader_addr }} build/${directory}/m5stick-nemo.ino.bootloader.bin \
-            0x8000 build/${directory}/m5stick-nemo.ino.partitions.bin \
-            0x10000 build/${directory}/m5stick-nemo.ino.bin
+            ${{ matrix.board.partitions.bootloader_addr }} src/m5stick-nemo/build/${directory}/m5stick-nemo.ino.bootloader.bin \
+            0x8000 src/m5stick-nemo/build/${directory}/m5stick-nemo.ino.partitions.bin \
+            0x10000 src/m5stick-nemo/build/${directory}/m5stick-nemo.ino.bin
 
       - name: List all files
         if: always()
