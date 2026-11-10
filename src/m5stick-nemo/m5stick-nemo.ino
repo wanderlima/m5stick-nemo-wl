@@ -334,7 +334,9 @@ int dh_pkts = 0;
 #include <WiFi.h>
 #include <esp_wifi.h>
 #include <esp_system.h>
+#if !defined(STICK_C_PLUS2)
 #include <esp_sleep.h>
+#endif
 #include "input/joyc.h"
 #if defined(CARDPUTER)
 #include "usb/badusb_hunter.h"                                                      //BADUSB HUNTER
@@ -809,8 +811,20 @@ void powerDown() {
   radiosIdle();
   DISP.fillScreen(BLACK);
   delay(80);
+#if defined(STICK_C_PLUS2)
+  // Plus2 cuts power by pulsing the hold pin. Deep sleep does not fit in
+  // IRAM together with the PSRAM driver this board needs to boot.
+  pinMode(4, OUTPUT);
+  for (int i = 0; i < 5; ++i) {
+    digitalWrite(4, LOW);
+    delay(50);
+    digitalWrite(4, HIGH);
+    delay(50);
+  }
+#else
   M5.Power.powerOff();
   esp_deep_sleep_start();
+#endif
 }
 
 void auto_off_proc() {
@@ -2349,7 +2363,7 @@ void aj_adv(){
       packet[i++] = 0x00;  // ???
       packet[i++] =  0x10;  // Type ???
       esp_fill_random(&packet[i], 3);
-      oAdvertisementData.addData(std::string((char *)packet, 17));
+      oAdvertisementData.addData(String((const char *)packet, 17));
       for (int i = 0; i < sizeof packet; i ++) {
         Serial.printf("%02x", packet[i]);
       }
@@ -2376,7 +2390,7 @@ void aj_adv(){
         Serial.printf("%02x", packet[k]);
       }
       Serial.println("");
-      oAdvertisementData.addData(std::string((char *)packet, size));
+      oAdvertisementData.addData(String((const char *)packet, size));
       free(packet);
       free((void*)display_name);
     } else if (androidPair) {
@@ -2399,7 +2413,7 @@ void aj_adv(){
       packet[i++] = 0x0A; // AD Type (Tx Power Level)
       packet[i++] = (rand() % 120) - 100; // -100 to +20 dBm
 
-      oAdvertisementData.addData(std::string((char *)packet, 14));
+      oAdvertisementData.addData(String((const char *)packet, 14));
       for (int i = 0; i < sizeof packet; i ++) {
         Serial.printf("%02x", packet[i]);
       }
@@ -2407,9 +2421,9 @@ void aj_adv(){
     } else {
       Serial.print(TXT_AJ_ADV);
       if (deviceType >= 18){
-        oAdvertisementData.addData(std::string((char*)data, sizeof(AppleTVPair)));
+        oAdvertisementData.addData(String((const char *)data, sizeof(AppleTVPair)));
       } else {
-        oAdvertisementData.addData(std::string((char*)data, sizeof(Airpods)));
+        oAdvertisementData.addData(String((const char *)data, sizeof(Airpods)));
       }
       for (int i = 0; i < sizeof(Airpods); i ++) {
         Serial.printf("%02x", data[i]);

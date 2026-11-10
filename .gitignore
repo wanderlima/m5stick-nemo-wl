@@ -4,6 +4,9 @@
 # Prerequisites
 build/
 
+# Local Arduino CLI sketchbook (scripts/build-stickc-plus2.sh)
+.arduino/
+
 # Prerequisites
 *.d
 

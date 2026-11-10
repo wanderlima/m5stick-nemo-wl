@@ -7,7 +7,6 @@
 
 #include <Arduino.h>
 #include <M5Unified.h>
-#include <driver/i2c.h>
 #include <esp_timer.h>
 
 extern int rotation;
@@ -16,6 +15,7 @@ extern bool joycClick;
 
 static const int JOYC_SDA = 0;
 static const int JOYC_SCL = 26;
+static const uint32_t JOYC_I2C_HZ = 100000;
 // The stick is a potentiometer, about -115..115. Inside ±79 nothing happens.
 // Y past ±80 steps every 1.5 s. X past ±80 is one click (left back, right
 // select) and stays locked until that axis returns to within ±10.
@@ -92,70 +92,50 @@ inline bool joycEnsureWire() {
   if (joycWireReady) {
     return true;
   }
-  // M5.begin() owns port 0 for the grove header. The hat is G0/G26.
-  M5.Ex_I2C.release();
-  i2c_driver_delete(I2C_NUM_0);
-  i2c_config_t conf = {};
-  conf.mode = I2C_MODE_MASTER;
-  conf.sda_io_num = (gpio_num_t)JOYC_SDA;
-  conf.scl_io_num = (gpio_num_t)JOYC_SCL;
-  conf.sda_pullup_en = GPIO_PULLUP_ENABLE;
-  conf.scl_pullup_en = GPIO_PULLUP_ENABLE;
-  conf.master.clk_speed = 100000;
-  if (i2c_param_config(I2C_NUM_0, &conf) != ESP_OK) {
-    return false;
-  }
-  if (i2c_driver_install(I2C_NUM_0, I2C_MODE_MASTER, 0, 0, 0) != ESP_OK) {
+  // M5.begin() already started the new I2C driver. Installing the legacy
+  // driver on top of it aborts the chip ("driver_ng is not allowed").
+  // The hat is SDA G0 / SCL G26, not the default external port.
+  if (!M5.Ex_I2C.begin(I2C_NUM_0, JOYC_SDA, JOYC_SCL)) {
     return false;
   }
   joycWireReady = true;
   return true;
 }
 
-inline bool joycCmdDone(i2c_cmd_handle_t cmd) {
-  esp_err_t err = i2c_master_cmd_begin(I2C_NUM_0, cmd, pdMS_TO_TICKS(50));
-  i2c_cmd_link_delete(cmd);
-  return err == ESP_OK;
-}
-
 inline bool joycPing(uint8_t addr) {
-  i2c_cmd_handle_t cmd = i2c_cmd_link_create();
-  i2c_master_start(cmd);
-  i2c_master_write_byte(cmd, (addr << 1) | I2C_MASTER_WRITE, true);
-  i2c_master_stop(cmd);
-  return joycCmdDone(cmd);
+  if (!M5.Ex_I2C.start(addr, false, JOYC_I2C_HZ)) {
+    return false;
+  }
+  return M5.Ex_I2C.stop();
 }
 
 // STOP between the register write and the read, matching M5Hat-Mini-JoyC.
 inline bool joycReadReg(uint8_t reg, uint8_t *data, uint8_t len) {
-  i2c_cmd_handle_t cmd = i2c_cmd_link_create();
-  i2c_master_start(cmd);
-  i2c_master_write_byte(cmd, (joyc.addr << 1) | I2C_MASTER_WRITE, true);
-  i2c_master_write_byte(cmd, reg, true);
-  i2c_master_stop(cmd);
-  if (!joycCmdDone(cmd)) {
+  if (!M5.Ex_I2C.start(joyc.addr, false, JOYC_I2C_HZ) || !M5.Ex_I2C.write(reg)) {
+    M5.Ex_I2C.stop();
     return false;
   }
-  cmd = i2c_cmd_link_create();
-  i2c_master_start(cmd);
-  i2c_master_write_byte(cmd, (joyc.addr << 1) | I2C_MASTER_READ, true);
-  for (uint8_t i = 0; i < len; i++) {
-    i2c_master_read_byte(cmd, &data[i], i + 1 < len ? I2C_MASTER_ACK : I2C_MASTER_NACK);
+  if (!M5.Ex_I2C.stop()) {
+    return false;
   }
-  i2c_master_stop(cmd);
-  return joycCmdDone(cmd);
+  if (!M5.Ex_I2C.start(joyc.addr, true, JOYC_I2C_HZ)) {
+    return false;
+  }
+  bool ok = M5.Ex_I2C.read(data, len, true);
+  M5.Ex_I2C.stop();
+  return ok;
 }
 
 inline bool joycWriteReg(uint8_t reg, const uint8_t *data, uint8_t len) {
-  i2c_cmd_handle_t cmd = i2c_cmd_link_create();
-  i2c_master_start(cmd);
-  i2c_master_write_byte(cmd, (joyc.addr << 1) | I2C_MASTER_WRITE, true);
-  i2c_master_write_byte(cmd, reg, true);
-  if (len) {
-    i2c_master_write(cmd, data, len, true);
+  if (!M5.Ex_I2C.start(joyc.addr, false, JOYC_I2C_HZ) || !M5.Ex_I2C.write(reg)) {
+    M5.Ex_I2C.stop();
+    return false;
   }
-  i2c_master_stop(cmd);
-  return joycCmdDone(cmd);
+  if (len && !M5.Ex_I2C.write(data, len)) {
+    M5.Ex_I2C.stop();
+    return false;
+  }
+  return M5.Ex_I2C.stop();
 }
 
 inline void joycLedOff() {
