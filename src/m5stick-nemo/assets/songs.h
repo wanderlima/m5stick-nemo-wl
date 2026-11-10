@@ -65,26 +65,12 @@ void setupSongs() {
       noteDuration = (wholenote) / abs(divider);
       noteDuration *= 1.5; // increases the duration in half for dotted notes
     }
-#if defined(STICK_C_PLUS)
     // playing 2 octave up (2^2) due to proximity of frequencies and high noise on low freqs
     SPEAKER.tone(melody[thisNote]*4, noteDuration*0.9);
     SPEAKER.tone(0, noteDuration*0.1);
     // Wait for the specief duration before playing the next note.
     delay(noteDuration);
     SPEAKER.stop();
-#elif defined(CARDPUTER)
-    // we only play the note for 90% of the duration, leaving 10% as a pause
-    SPEAKER.tone(melody[thisNote], noteDuration * 0.9);
-    // Wait for the specief duration before playing the next note.
-    delay(noteDuration);
-#elif defined(STICK_C_PLUS2)
-    // playing 2 octave up (2^2) due to proximity of frequencies and high noise on low freqs
-    SPEAKER.tone(melody[thisNote]*4, noteDuration*0.9);
-    SPEAKER.tone(0, noteDuration*0.1);
-    // Wait for the specief duration before playing the next note.
-    delay(noteDuration);
-    SPEAKER.stop();
-#endif
     
   }
 }

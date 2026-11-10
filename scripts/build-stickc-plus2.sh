@@ -96,7 +96,7 @@ for attempt in 1 2 3 4 5 6; do
     --jobs 1 \
     --build-property build.partitions=huge_app \
     --build-property upload.maximum_size=3145728 \
-    --build-property "compiler.cpp.extra_flags=-DSTICK_C_PLUS2 -DLANGUAGE_EN_US" \
+    --build-property "compiler.cpp.extra_flags=-DLANGUAGE_EN_US" \
     --output-dir "$OUT_DIR" \
     "$ROOT/src/m5stick-nemo" >"$log" 2>&1
   code=$?

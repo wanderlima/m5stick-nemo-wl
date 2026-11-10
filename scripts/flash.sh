@@ -1,44 +1,29 @@
 #!/usr/bin/env bash
+# Flash build/M5Nemo-M5StickCPlus2.bin at offset 0x0.
 
-set -eu
+set -euo pipefail
 
-# Define the script usage
-usage() {
-    cat <<EOF
-Usage: $0 [options]
-Options:
-    --build-config=./configs/.env.M5Cardputer   The .env file to use.
-    --device=/dev/ttyUSB0           The device.
-EOF
-}
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+PORT="${1:-}"
+IMAGE="$ROOT/build/M5Nemo-M5StickCPlus2.bin"
 
-# Parse the arguments
-for arg in "$@"; do
-    case $arg in
-        --build-config=*)       BUILD_CONFIG="${arg#*=}" ;;
-        --device=*)           device="${arg#*=}" ;;
-        *)                  usage ;;
-    esac
-done
-
-BUILD_CONFIG=${BUILD_CONFIG:-./configs/.env.M5Cardputer}
-
-if [ -z "$device" ]; then
-    usage
-    exit 1
+if [[ -z "$PORT" ]]; then
+  echo "Usage: $0 /dev/cu.usbserial-XXXXXXXX" >&2
+  exit 1
 fi
 
-set -eu
+if [[ ! -f "$IMAGE" ]]; then
+  echo "Missing ${IMAGE}. Run ./scripts/build-stickc-plus2.sh first." >&2
+  exit 1
+fi
 
-echo "Running with config: $BUILD_CONFIG and device $device"
-cat $BUILD_CONFIG
-source $BUILD_CONFIG
-
-docker run --rm -it -v $(pwd):/m5stick-nemo --device=$device m5stick-nemo/arduino-build-cli:test esptool.py --port $device erase_flash
-if [[ "${LOCALE}" == "en-us" ]]; then
-  output_file="M5Nemo-${NAME}.bin"
+if command -v esptool >/dev/null 2>&1; then
+  ESPTOOL=(esptool)
+elif command -v esptool.py >/dev/null 2>&1; then
+  ESPTOOL=(esptool.py)
 else
-  output_file="M5Nemo-${NAME}.${LOCALE}.bin"
+  echo "esptool not found. Install it with: pip install -U esptool" >&2
+  exit 1
 fi
 
-docker run --rm -it -v $(pwd):/m5stick-nemo --device=$device m5stick-nemo/arduino-build-cli:test esptool.py --port $device write_flash -z 0 /m5stick-nemo/build/${output_file}
+"${ESPTOOL[@]}" --chip esp32 --port "$PORT" write-flash -z 0x0 "$IMAGE"
